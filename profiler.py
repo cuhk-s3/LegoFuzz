@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import os, re, tempfile, sys, argparse, shutil
 from datetime import datetime
 from copy import deepcopy, copy
@@ -6,7 +7,10 @@ import random
 import subprocess as sp
 import ctypes
 from enum import Enum, auto
+from dataclasses import dataclass, field, asdict
+from typing import List, Dict
 
+from functioner import FunctionDB
 from variable import VarType
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -27,25 +31,27 @@ class VarValue(Enum):
     STABLE      =   auto() # value has been the same
     UNSTABLE    =   auto() # value has been changing
 
+@dataclass
 class Var:
     """Variable"""
     var_name:str            # variable name
     var_type:str            # variable type as string
-    var_value:int           # value
+    var_value:int = 111     # value
     is_stable:bool = True   # if the variable values is stable, i.e., never changed or len(set(values))<=1.
     is_constant:bool=False  # variable has "const" keyword
     is_global:bool=False    # if the vairable has global storage
     scope_id:int=-1         # scope id of the variable
 
+@dataclass
 class Tag:
     """Tag"""
     tag_id:int
-    tag_str:str                 # the original tag string showsn in the source file
-    tag_check_strs:list[str]=[] # inserted tag and tagcheck strings
+    tag_str:str                 # the original tag string shown in the source file
     tag_var:Var                 # tagged variable
-    tag_envs:list[Var]          # env vairales
     statement_id:int            # id of the statement that the Tag belongs to
-    is_statement:bool = False   # if this tag is a stand-alone statement
+    is_statement:bool = False   # if this tag is a stand-alone statement    
+    tag_check_strs: List[str] = field(default_factory=list)    # inserted tag and tagcheck strings
+    tag_envs:List[Var] = field(default_factory=list)          # env vairales
 
 class ScopeTree:
     def __init__(self, id:int) -> None:
@@ -84,12 +90,10 @@ def strip_type_str(ori_type_str:str)->str:
 
 MAX_CONST_CCOMP = 4611686018427387904 # 2**62, CompCert cannot handle constant values larger than this
 
-class Synthesizer:
-    def __init__(self, prob:int, DEBUG: bool) -> None:
-        assert 0 < prob <= 100
-        self.prob = prob
+class Profiler:
+    def __init__(self, DEBUG: bool) -> None:
         self.DEBUG = DEBUG
-    
+
     def static_analysis(self, src_file):
         """
         Statically analyze the source file to (1) get tag_var_name for each tag
@@ -108,19 +112,21 @@ class Synthesizer:
             scope_curr_id = int(scope_curr_id)
             scope_parent_id = int(scope_parent_id)
             assert tag_id not in self.tags
-            new_var = Var()
-            new_var.scope_id = scope_curr_id
-            new_var.is_constant = "const" in tag_type_str
-            new_var.var_name = tag_var_name
-            new_var.var_type = strip_type_str(tag_type_str)
-            new_var.is_global = scope_curr_id == 0
+            new_var = Var(
+                var_name=tag_var_name,
+                var_type=strip_type_str(tag_type_str),
+                is_constant="const" in tag_type_str,
+                scope_id=scope_curr_id,
+                is_global=(scope_curr_id == 0)
+            )
 
-            new_tag = Tag()
-            new_tag.tag_str = tag_str
-            new_tag.is_statement = tag_style == 's'
-            new_tag.tag_var = new_var
-            new_tag.tag_envs = []
-            new_tag.statement_id = int(stmt_id)
+            new_tag = Tag(
+                tag_id=tag_id,
+                tag_str=tag_str,
+                tag_var=new_var,
+                statement_id=int(stmt_id),
+                is_statement=(tag_style == 's')
+            )
             self.tags[tag_id] = new_tag
             #construct scope_up tree
             if scope_curr_id not in self.scope_up:
@@ -312,41 +318,31 @@ return v0; \
             if tag_id not in checked_tag_id:
                 for env_i in range(len(self.tags[tag_id].tag_envs)):
                     self.tags[tag_id].tag_envs[env_i].is_stable = False
-        for tag in self.tags:
-            # print info about this tag
-            print(f"Tag{tag}: {self.tags[tag].tag_var.var_name}({self.tags[tag].tag_var.var_value})")
-
-
-    def remove_valuetag(self):
-        """
-        Remove a ValueTag from source file
-        """
-        for tag_id in self.tags:
-            self.src = self.src.replace(f"#define Tag{tag_id}(x) (x)\n", "")
-            if self.tags[tag_id].is_statement:
-                self.src = self.src.replace(self.tags[tag_id].tag_str, '')
-            else:
-                self.src =self.src.replace(self.tags[tag_id].tag_str, self.tags[tag_id].tag_var.var_name)
-            for tag_check_str in self.tags[tag_id].tag_check_strs:
-                self.src = self.src.replace(tag_check_str, '')
-        self.src = re.sub(r'[\w|_|\s|*]+ Tag\d+\(.*\)\{.*\}\n', '', self.src)
-    
-    def ignore_typedef(self, _typedef:str) -> bool:
-        ignored_typedef = [
-            "int8_t", "uint8_t", "int16_t", "uint16_t", "int32_t", "uint32_t", "int64_t", "uint64_t", "char"
-        ]
-        for ignored in ignored_typedef:
-            if f'{ignored};' in _typedef:
-                return True
-        return False
+        return self.src_syn_orig, self.tags
 
 class SynthesizerError(Exception):
     pass
+
+def serialize_tags(tags: dict) -> list:
+    serialized = {}
+    for tag_id, tag in tags.items():
+        tag_dict = {
+            'id': tag.tag_id,
+            'tag_str': tag.tag_str,
+            'tag_check_strs': tag.tag_check_strs,
+            'tag_var': asdict(tag.tag_var),
+            'tag_envs': [asdict(env) for env in tag.tag_envs],
+            'statement_id': tag.statement_id,
+            'is_statement': tag.is_statement
+        }
+        serialized[tag_id] = tag_dict
+    return serialized
 
 if __name__=='__main__':
 
     parser = argparse.ArgumentParser(description='Profile functions in a function database.')
     parser.add_argument('--src', dest='SRC', required=True, help='path to the original function database.')
+    parser.add_argument('--dst', dest='DST', required=True, help='path to the output function database.')
     
     args = parser.parse_args()
     if not os.path.exists(args.SRC):
@@ -354,8 +350,27 @@ if __name__=='__main__':
         parser.print_help()
         exit(1)
     
-    syner = Synthesizer(prob=100, DEBUG=False)
-    try:
-        all_syn_files = syner.profiling(args.SRC)
-    except SynthesizerError:
-        print("SynthesizerError (OK).")
+    functionDB = FunctionDB(args.SRC)
+    for func in functionDB.all_functions:
+            tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
+            tmp_f.close
+            with open(tmp_f.name, "w") as f:
+                f.write(func.function_body)
+                f.write("\n")
+                f.write("int main() {\n")
+                f.write("{func_name}({func_io});\n".format(func_name=func.call_name, func_io = ','.join(map(str, func.io_list[0][0]))))
+                f.write("return 0;\n")
+                f.write("}\n")
+
+            syner = Profiler(DEBUG=False)
+            try:
+                profiled_code, res = syner.profiling(tmp_f.name)
+                func.function_body = profiled_code
+                serialized_tags = serialize_tags(res)
+                func.profile = serialized_tags 
+            except SynthesizerError:
+                print("SynthesizerError (OK).")
+
+    # Write to new function database
+    with open(args.DST, 'w') as f:
+        f.write(json.dumps([func.to_json() for func in functionDB.all_functions], indent=4))

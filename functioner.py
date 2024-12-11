@@ -62,6 +62,7 @@ class Function:
             "return_type": VarType.to_str(self.return_type),
             "function": self.function_body,
             "io_list": self.io_list,
+            "profile": self.profile,
             "misc": self.misc,
             "src_file": self.src_file,
             "include_headers": self.include_headers,
