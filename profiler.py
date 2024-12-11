@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 import json
-import os, re, tempfile, sys, argparse, shutil
+import os, re, tempfile, sys, argparse
 from datetime import datetime
-from copy import deepcopy, copy
+from copy import deepcopy
 import random
 import subprocess as sp
-import ctypes
 from enum import Enum, auto
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict
 
 from functioner import FunctionDB
 from variable import VarType
@@ -31,27 +28,25 @@ class VarValue(Enum):
     STABLE      =   auto() # value has been the same
     UNSTABLE    =   auto() # value has been changing
 
-@dataclass
 class Var:
     """Variable"""
     var_name:str            # variable name
     var_type:str            # variable type as string
-    var_value:int = 111     # value
+    var_value:int           # value
     is_stable:bool = True   # if the variable values is stable, i.e., never changed or len(set(values))<=1.
     is_constant:bool=False  # variable has "const" keyword
     is_global:bool=False    # if the vairable has global storage
     scope_id:int=-1         # scope id of the variable
 
-@dataclass
 class Tag:
     """Tag"""
     tag_id:int
-    tag_str:str                 # the original tag string shown in the source file
+    tag_str:str                 # the original tag string showsn in the source file
+    tag_check_strs:list[str]=[] # inserted tag and tagcheck strings
     tag_var:Var                 # tagged variable
+    tag_envs:list[Var]          # env vairales
     statement_id:int            # id of the statement that the Tag belongs to
-    is_statement:bool = False   # if this tag is a stand-alone statement    
-    tag_check_strs: List[str] = field(default_factory=list)    # inserted tag and tagcheck strings
-    tag_envs:List[Var] = field(default_factory=list)          # env vairales
+    is_statement:bool = False   # if this tag is a stand-alone statement
 
 class ScopeTree:
     def __init__(self, id:int) -> None:
@@ -112,21 +107,19 @@ class Profiler:
             scope_curr_id = int(scope_curr_id)
             scope_parent_id = int(scope_parent_id)
             assert tag_id not in self.tags
-            new_var = Var(
-                var_name=tag_var_name,
-                var_type=strip_type_str(tag_type_str),
-                is_constant="const" in tag_type_str,
-                scope_id=scope_curr_id,
-                is_global=(scope_curr_id == 0)
-            )
+            new_var = Var()
+            new_var.scope_id = scope_curr_id
+            new_var.is_constant = "const" in tag_type_str
+            new_var.var_name = tag_var_name
+            new_var.var_type = strip_type_str(tag_type_str)
+            new_var.is_global = scope_curr_id == 0
 
-            new_tag = Tag(
-                tag_id=tag_id,
-                tag_str=tag_str,
-                tag_var=new_var,
-                statement_id=int(stmt_id),
-                is_statement=(tag_style == 's')
-            )
+            new_tag = Tag()
+            new_tag.tag_str = tag_str
+            new_tag.is_statement = tag_style == 's'
+            new_tag.tag_var = new_var
+            new_tag.tag_envs = []
+            new_tag.statement_id = int(stmt_id)
             self.tags[tag_id] = new_tag
             #construct scope_up tree
             if scope_curr_id not in self.scope_up:
@@ -318,25 +311,24 @@ return v0; \
             if tag_id not in checked_tag_id:
                 for env_i in range(len(self.tags[tag_id].tag_envs)):
                     self.tags[tag_id].tag_envs[env_i].is_stable = False
-        return self.src_syn_orig, self.tags
+        # serialize tags to json
+        serialized_tags = []
+        for tag_id in self.tags:
+            tag = self.tags[tag_id]
+            serialized_tags.append({
+                'tag_id': tag_id,
+                'tag_str': getattr(tag, 'tag_str', ''),
+                'tag_check_strs': getattr(tag, 'tag_check_strs', []),
+                'tag_var': getattr(tag, 'tag_var', None).__dict__ if tag.tag_var else {},
+                'tag_envs': [env.__dict__ for env in getattr(tag, 'tag_envs', [])],
+                'statement_id': getattr(tag, 'statement_id', None),
+                'is_statement': getattr(tag, 'is_statement', False),
+            })
+
+        return self.src_syn_orig, serialized_tags
 
 class SynthesizerError(Exception):
     pass
-
-def serialize_tags(tags: dict) -> list:
-    serialized = {}
-    for tag_id, tag in tags.items():
-        tag_dict = {
-            'id': tag.tag_id,
-            'tag_str': tag.tag_str,
-            'tag_check_strs': tag.tag_check_strs,
-            'tag_var': asdict(tag.tag_var),
-            'tag_envs': [asdict(env) for env in tag.tag_envs],
-            'statement_id': tag.statement_id,
-            'is_statement': tag.is_statement
-        }
-        serialized[tag_id] = tag_dict
-    return serialized
 
 if __name__=='__main__':
 
@@ -364,10 +356,9 @@ if __name__=='__main__':
 
             syner = Profiler(DEBUG=False)
             try:
-                profiled_code, res = syner.profiling(tmp_f.name)
+                profiled_code, serialized_tags = syner.profiling(tmp_f.name)
                 func.function_body = profiled_code
-                serialized_tags = serialize_tags(res)
-                func.profile = serialized_tags 
+                func.profile = serialized_tags
             except SynthesizerError:
                 print("SynthesizerError (OK).")
 
