@@ -324,8 +324,13 @@ return v0; \
                 'statement_id': getattr(tag, 'statement_id', None),
                 'is_statement': getattr(tag, 'is_statement', False),
             })
+        code = re.sub(
+            r'(?s)\bint\s+main\s*\([^)]*\)\s*\{.*?\}',
+            '',
+            self.src_syn_orig
+        )
 
-        return self.src_syn_orig, serialized_tags
+        return code, serialized_tags
 
 class SynthesizerError(Exception):
     pass
