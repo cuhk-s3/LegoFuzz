@@ -352,6 +352,9 @@ if __name__=='__main__':
             tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
             tmp_f.close
             with open(tmp_f.name, "w") as f:
+                for misc in func.misc:
+                    f.write(misc)
+                    f.write("\n")
                 f.write(func.function_body)
                 f.write("\n")
                 f.write("int main() {\n")
