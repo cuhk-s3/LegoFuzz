@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from pathlib import Path
 import string
 import os, re, tempfile, sys, argparse, shutil
 from datetime import datetime
@@ -13,13 +14,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-MAX_CHAIN_NUM = 50 # maximum number of functions for one synthesis chain
+MAX_CHAIN_NUM = 2 # maximum number of functions for one synthesis chain
 
 class Synthesizer:
-    def __init__(self, func_database:str, prob:int) -> None:
+    def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
         assert 0 < prob <= 100
         self.prob = prob
         self.functionDB = FunctionDB(func_database)
+        self.DEBUG = DEBUG
     
     def ignore_typedef(self, _typedef:str) -> bool:
         ignored_typedef = [
@@ -92,31 +94,36 @@ class Synthesizer:
                 output_str += f'+(({VarType.to_str(func_return_type)})({env.var_name})-({env_value_cast}))'
         return output_str, output
 
-    def replace_valuetag_with_func(self, tag_id:int, tgt_func_idx:int):
+    def replace_valuetag_with_func(self, tag_id:str, tgt_func_idx:int):
         """
         Replace a ValueTag with the selected function call
         """
         # use stable tag_var and env_vars for synthesis
         stable_env_vars = []
-        if self.tags[tag_id].tag_var.is_stable:
-            stable_env_vars.append(self.tags[tag_id].tag_var)
-        for env in self.tags[tag_id].tag_envs:
-            if env.is_stable:
+        if 'is_stable' in self.tags[tag_id]['tag_var']:
+            if self.tags[tag_id]['tag_var']['is_stable']:
+                stable_env_vars.append(self.tags[tag_id].tag_var)
+        for env in self.tags[tag_id]['tag_envs']:
+            if 'is_stable' in env and env['is_stable']:
                 stable_env_vars.append(env)
 
         # select the first io pair of the tgt_func
         func_inp_list, func_out = self.functionDB[tgt_func_idx].io_list[0]
         new_input_str = self.synthesize_input(stable_env_vars, func_inp_list, self.functionDB[tgt_func_idx].args_type)
+        if self.DEBUG:
+            print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "new_input_str", new_input_str)
         new_output_str, new_output = self.synthesize_output(stable_env_vars, func_out, self.functionDB[tgt_func_idx].return_type)
-        
+        if self.DEBUG:
+            print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "new_output_str", new_output_str, "new_output", new_output)
+
         # synthesize func_call for expr, make sure to restore the value of the expr
-        if not self.tags[tag_id].is_statement:
+        if not self.tags[tag_id]['is_statement']:
             func_call = "(({tag_type})({call_name}({input}){output})+{tag_var_value})".format(
-                tag_type=self.tags[tag_id].tag_var.var_type, 
+                tag_type=self.tags[tag_id]['tag_var']['var_type'], 
                 call_name=self.functionDB[tgt_func_idx].call_name, 
                 input=", ".join(new_input_str), 
                 output=f"{new_output_str}-({new_output})",
-                tag_var_value=self.tags[tag_id].tag_var.var_name,
+                tag_var_value=self.tags[tag_id]['tag_var']['var_name'],
             )
         # for statement tag, we also want to assign the function call to a stable env variable
         else:
@@ -126,15 +133,21 @@ class Synthesizer:
                 output=new_output_str
             )
             restore_env = None
-            if not self.tags[tag_id].tag_var.is_constant:
-                restore_env = self.tags[tag_id].tag_var
+            if not self.tags[tag_id]['tag_var']['is_constant']:
+                restore_env = self.tags[tag_id]['tag_var']
             elif len(stable_env_vars) > 0:
                 restore_env = random.choice(stable_env_vars)
-            if restore_env is not None and not restore_env.is_constant:
-                func_call = f'{restore_env.var_name} = ({restore_env.var_type})({func_call}-({new_output}))+({restore_env.var_value});'
-
+            if restore_env is not None and not restore_env['is_constant']:
+                var_name = restore_env['var_name']
+                var_type = restore_env['var_type']
+                var_value = restore_env['var_value']
+                func_call = f'{var_name} = ({var_type})({func_call}-({new_output}))+({var_value});'
+        if self.DEBUG:
+            print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "func_call", func_call)
         # insert the function call
-        self.src_syn = self.src_syn.replace(self.tags[tag_id].tag_str, f'/*TAG{tag_id}:STA*/' + func_call + f'/*TAG{tag_id}:END:{self.tags[tag_id].tag_var.var_name}*/')
+        tag_str = self.tags[tag_id]['tag_str']
+        tag_var_name = self.tags[tag_id]['tag_var']['var_name']
+        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/' + func_call + f'/*TAG{tag_id}:END:{tag_var_name}*/')
 
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
         """
@@ -143,19 +156,21 @@ class Synthesizer:
         tgt_func = self.functionDB[tgt_func_idx]
         synth_funcs = []
         for tag_id in tgt_func.alive_tags:
+            if len(used_func) == len(self.functionDB):
+                break
             if tag_id in replaced_tags[tgt_func_idx] or random.randint(0, 100) > self.prob:
                 continue
             while True:
-                synth_func_idx = random.choice(0, len(self.functionDB)-1)
+                synth_func_idx = random.randint(0, len(self.functionDB)-1)
                 if self.functionDB[synth_func_idx].has_io and synth_func_idx not in used_func:
                     break
-            self.replace_valuetag_with_func(tag_id, synth_func_idx)
+            self.replace_valuetag_with_func(str(tag_id), synth_func_idx)
             replaced_tags[tgt_func_idx].append(tag_id)
             synth_funcs.append(synth_func_idx)
             used_func.append(synth_func_idx)
         return synth_funcs
 
-    def synthesizer(self, dst_dir:str, num_mutant:int=1, DEBUG:bool=False):
+    def synthesizer(self, dst_dir:Path, num_mutant:int=1):
         """
         Synthesize a source file by replacing variables/constants with function calls.
         """
@@ -166,11 +181,10 @@ class Synthesizer:
                 seed_func = self.functionDB[seed_func_idx]
                 break
 
-        self.DEBUG = DEBUG
         assert num_mutant >= 1
 
         succ_file_id = id_generator()
-        src_filename = str((dst_dir / f"{succ_file_id}_seed.c").absolute())
+        src_filename = str((dst_dir / f'{succ_file_id}_seed.c').absolute())
         with open(src_filename, "w") as f:
             for misc in seed_func.misc:
                 f.write(misc)
@@ -200,13 +214,18 @@ class Synthesizer:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant start", num_i, flush=True)
             self.src_syn = copy(self.src_orig)
             used_func = [seed_func_idx]
-            replaced_tags = [] # a dict that contains the replaced tags of used functions(ready to be tgts)
-            for _ in range(random.randint(MAX_CHAIN_NUM / 2, MAX_CHAIN_NUM)):
+            replaced_tags = {seed_func_idx: []} # a dict that contains the replaced tags of used functions(ready to be tgts)
+            repeat_time = random.randint(MAX_CHAIN_NUM // 2, MAX_CHAIN_NUM)
+            for _ in range(repeat_time):
                 tgt_func_idx = random.choice(used_func)
-                # FIXME: we need to change the tag name to be unique with func_name so that we can precisely replace them
                 self.tags = self.functionDB[tgt_func_idx].profile
                 synth_funcs = self.synthesize_one(tgt_func_idx, used_func, replaced_tags)
+                if self.DEBUG:
+                    print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "synth_funcs", synth_funcs)
                 used_func.extend(synth_funcs)
+                # update replaced_tags
+                for synth_func in synth_funcs:
+                    replaced_tags[synth_func] = []
                 self.insert_func_decl(synth_funcs)
             dst_filename = f'{os.path.splitext(src_filename)[0]}_syn{num_i}.c'
             with open(dst_filename, "w") as f:
@@ -233,8 +252,11 @@ if __name__=='__main__':
         parser.print_help()
         exit(1)
 
-    syner = Synthesizer(args.DB, prob=100)
+    dst_dir = Path(args.DST)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    syner = Synthesizer(args.DB, prob=100, DEBUG=True)
     try:
-        all_syn_files = syner.synthesizer(args.DST, num_mutant=1)
+        all_syn_files = syner.synthesizer(dst_dir, num_mutant=1)
     except SynthesizerError:
         print("SynthesizerError (OK).")
