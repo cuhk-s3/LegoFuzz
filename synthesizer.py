@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-MAX_CHAIN_NUM = 50 # maximum number of functions for one synthesis chain
+MAX_CHAIN_NUM = 2 # maximum number of iterations for one synthesis
 
 class Synthesizer:
     def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
@@ -222,7 +222,6 @@ class Synthesizer:
                 synth_funcs = self.synthesize_one(tgt_func_idx, used_func, replaced_tags)
                 if self.DEBUG:
                     print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "synth_funcs", synth_funcs)
-                used_func.extend(synth_funcs)
                 # update replaced_tags
                 for synth_func in synth_funcs:
                     replaced_tags[synth_func] = []
