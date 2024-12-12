@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-MAX_CHAIN_NUM = 2 # maximum number of functions for one synthesis chain
+MAX_CHAIN_NUM = 50 # maximum number of functions for one synthesis chain
 
 class Synthesizer:
     def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
