@@ -12,6 +12,7 @@ class Function:
     function_body = ''
     io_list = []
     profile = []
+    alive_tags = []
     misc = []
     src_file = ''
     include_headers = []
@@ -45,6 +46,8 @@ class Function:
         self.is_valid = True
         if 'profile' in func_json:
             self.profile = func_json['profile']
+        if 'alive_tags' in func_json:
+            self.alive_tags = func_json['alive_tags']
         if 'misc' in func_json:
             self.misc = func_json['misc']
         if 'src_file' in func_json:
@@ -63,6 +66,7 @@ class Function:
             "function": self.function_body,
             "io_list": self.io_list,
             "profile": self.profile,
+            "alive_tags": self.alive_tags,
             "misc": self.misc,
             "src_file": self.src_file,
             "include_headers": self.include_headers,

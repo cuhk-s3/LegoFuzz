@@ -330,7 +330,7 @@ return v0; \
             self.src_syn_orig
         )
 
-        return code, serialized_tags
+        return code, serialized_tags, self.alive_tags
 
 class SynthesizerError(Exception):
     pass
@@ -361,9 +361,10 @@ if __name__=='__main__':
 
             syner = Profiler(DEBUG=False)
             try:
-                profiled_code, serialized_tags = syner.profiling(tmp_f.name)
+                profiled_code, serialized_tags, alive_tags = syner.profiling(tmp_f.name)
                 func.function_body = profiled_code
                 func.profile = serialized_tags
+                func.alive_tags = alive_tags
             except SynthesizerError:
                 print("SynthesizerError (OK).")
 
