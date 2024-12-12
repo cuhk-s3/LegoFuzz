@@ -41,6 +41,7 @@ class Var:
 class Tag:
     """Tag"""
     tag_id:int
+    func_name:str               # function name that the tag belongs to
     tag_str:str                 # the original tag string showsn in the source file
     tag_check_strs:list[str]=[] # inserted tag and tagcheck strings
     tag_var:Var                 # tagged variable
@@ -89,6 +90,30 @@ class Profiler:
     def __init__(self, DEBUG: bool) -> None:
         self.DEBUG = DEBUG
 
+    def preprocess_tags(self, src_file, func_name):
+        """
+        Before profiling, we need to preprocess the source file to rename tags.
+        """
+        with open(src_file, "r") as f:
+            code = f.read()
+        all_tags = re.findall(r'(Tag(\d+)\(\/\*(.*?):(\w+):(\w+):(\w+):(\w+)\*\/(.*?)\))', code)
+        all_defines = re.findall(r'#define\s+Tag(\d+)\(.*?\)', code)
+        # add func_name after tag_id and replace the old tag
+        # example: Tag1(/*int:642:642:606:e*/b) -> Tag1_func_name(/*int:642:642:606:e*/b)
+        for tag_info in all_tags:
+            tag_str, tag_id, tag_type_str, scope_curr_id, scope_parent_id, stmt_id, tag_style, tag_var_name = tag_info[:]
+            tag_id = int(tag_id)
+            new_tag_str = f"Tag{tag_id}_{func_name}(/*{tag_type_str}:{scope_curr_id}:{scope_parent_id}:{stmt_id}:{tag_style}*/{tag_var_name})"
+            code = code.replace(tag_str, new_tag_str, 1)
+        # add func_name after tag_id in defines
+        # #define Tag1(x) (x) -> #define Tag1_func_name(x) (x)
+        for tag_info in all_defines:
+            tag_id = int(tag_info)
+            new_tag_define = f"#define Tag{tag_id}_{func_name}(x) (x)"
+            code = code.replace(f"#define Tag{tag_id}(x) (x)", new_tag_define)
+        with open(src_file, "w") as f:
+            f.write(code)
+
     def static_analysis(self, src_file):
         """
         Statically analyze the source file to (1) get tag_var_name for each tag
@@ -97,12 +122,12 @@ class Profiler:
         # get global/local information of each tag
         with open(src_file, "r") as f:
             code = f.read()
-        static_tags = re.findall(r'(Tag(\d+)\(\/\*(.*?):(\w+):(\w+):(\w+):(\w+)\*\/(.*?)\))', code)
+        static_tags = re.findall(r'(Tag(\d+)_(.*?)\(\/\*(.*?):(\w+):(\w+):(\w+):(\w+)\*\/(.*?)\))', code)
         self.tags = {}
         self.scope_up = {} # key:val ==> child_scope:parent_scope
         self.scope_down = {} # key:[val] ==> parent_scope:[child_scope(s)]
         for tag_info in static_tags:
-            tag_str, tag_id, tag_type_str, scope_curr_id, scope_parent_id, stmt_id, tag_style, tag_var_name = tag_info[:]
+            tag_str, tag_id, func_name, tag_type_str, scope_curr_id, scope_parent_id, stmt_id, tag_style, tag_var_name = tag_info[:]
             tag_id = int(tag_id)
             scope_curr_id = int(scope_curr_id)
             scope_parent_id = int(scope_parent_id)
@@ -116,6 +141,7 @@ class Profiler:
 
             new_tag = Tag()
             new_tag.tag_str = tag_str
+            new_tag.func_name = func_name
             new_tag.is_statement = tag_style == 's'
             new_tag.tag_var = new_var
             new_tag.tag_envs = []
@@ -175,6 +201,7 @@ class Profiler:
         for var_ty in var_types:
             fmt_strs += f':%"{VarType.get_format(VarType.from_str(var_ty))}"'
         v_para_strs = ",".join([f'v{var_i}' for var_i in range(len(var_types))])
+        func_name = self.tags[tag_id].func_name
         print_tag = f'printf("Tag{tag_id}{fmt_strs}\\n", {v_para_strs});'
         var_defs = []
         count_defs = []
@@ -191,7 +218,7 @@ class Profiler:
             else_ifs.append(f'else if(i{var_i}==1&&v{var_i}!=last_v{var_i}){{{print_tag}i{var_i}=2;}}')
         
         tag_def = \
-f'{return_type} Tag{tag_id}({",".join(var_defs)}){{ \
+f'{return_type} Tag{tag_id}_{func_name}({",".join(var_defs)}){{ \
 {" ".join(count_defs)} \
 {" ".join(last_defs)} \
 if (i0 == 0) {{ \
@@ -216,16 +243,17 @@ return v0; \
                 self.tags[tag_id].tag_envs.append(deepcopy(self.tags[env_id].tag_var))
             envs = [tag_id] + envs # add self as the first env
             envs_str = ','.join([self.tags[env_id].tag_var.var_name if '*' not in self.tags[env_id].tag_var.var_name else '&({var})==0?{invalid}:{var}'.format(var=self.tags[env_id].tag_var.var_name, invalid=INVALID_TAG_VALUE) for env_id in envs])
+            func_name = self.tags[tag_id].func_name
             # place TagBefore check Call
-            bef_tag_call = f'/*bef*/Tag{tag_id}({envs_str});'
+            bef_tag_call = f'/*bef*/Tag{tag_id}_{func_name}({envs_str});'
             src = src.replace(f'/*bef_stmt:{self.tags[tag_id].statement_id}*/', bef_tag_call, 1)
             self.tags[tag_id].tag_check_strs.append(bef_tag_call+"\n")
             # place Tag call
-            tag_call = f'/*tag*/Tag{tag_id}({envs_str})'
+            tag_call = f'/*tag*/Tag{tag_id}_{func_name}({envs_str})'
             src = src.replace(self.tags[tag_id].tag_str, tag_call, 1)
             # self.tags[tag_id].tag_str = tag_call
             # place TagAfter check Call
-            aft_tag_call = f'/*aft*/Tag{tag_id}({envs_str});'
+            aft_tag_call = f'/*aft*/Tag{tag_id}_{func_name}({envs_str});'
             src = src.replace(f'/*aft_stmt:{self.tags[tag_id].statement_id}*/', aft_tag_call, 1)
             self.tags[tag_id].tag_check_strs.append(aft_tag_call+"\n")
             # replace Tag declaration
@@ -233,16 +261,17 @@ return v0; \
             for env in envs:
                 var_types.append(self.tags[env].tag_var.var_type)
             tag_defs = "\n" + self.construct_tag_def(tag_id, var_types)
-            src = src.replace(f"#define Tag{tag_id}(x) (x)", tag_defs, 1)
+            src = src.replace(f"#define Tag{tag_id}_{func_name}(x) (x)", tag_defs, 1)
             self.tags[tag_id].tag_check_strs.append(tag_defs + "\n")
         with open(src_file, 'w') as f:
             f.write(src)
 
 
-    def profiling(self, filename):
+    def profiling(self, filename, func_name):
         """
         Instrument file with profiler;
         Run and collect values.
+        Note: we would rename tags to Tag{tag_id}_{func_name} before profiling.
         """
         # profiling
         ret, _ = run_cmd(f"{PROFILER} {filename} -- -I{CSMITH_HOME}/include", DEBUG=self.DEBUG)
@@ -252,6 +281,7 @@ return v0; \
         with open(filename, 'r') as f:
             self.src_orig = f.read()
         
+        self.preprocess_tags(filename, func_name)
         self.static_analysis(filename)
         self.add_tags(filename)
 
@@ -263,10 +293,14 @@ return v0; \
             if ret != CMD.OK:
                 if os.path.exists(exe_out):
                     os.remove(exe_out)
+                if self.DEBUG:
+                    print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">>run_cmd with {CC1} failed.", flush=True)
                 raise ProfilerError
             ret, profile_out_1 = run_cmd(exe_out, timeout=3, DEBUG=self.DEBUG)
             if ret != CMD.OK:
                 os.remove(exe_out)
+                if self.DEBUG:
+                    print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">>run_cmd with {exe_out} failed.", flush=True)
                 raise ProfilerError
             os.remove(exe_out)
         env_re_str = ":".join([':?([-|\d]+)?']*(NUM_ENV)) #@FIXME: no need to have exact NUM_ENV env vars here, now a temp fix is shown below and thus env_re_str is useless.
@@ -317,6 +351,7 @@ return v0; \
             serialized_tags.append({
                 'tag_id': tag_id,
                 'tag_str': getattr(tag, 'tag_str', ''),
+                'func_name': getattr(tag, 'func_name', ''),
                 'tag_check_strs': getattr(tag, 'tag_check_strs', []),
                 'tag_var': getattr(tag, 'tag_var', None).__dict__ if tag.tag_var else {},
                 'tag_envs': [env.__dict__ for env in getattr(tag, 'tag_envs', [])],
@@ -361,9 +396,9 @@ if __name__=='__main__':
                 f.write("return 0;\n")
                 f.write("}\n")
 
-            profiler = Profiler(DEBUG=False)
+            profiler = Profiler(DEBUG=True)
             try:
-                profiled_code, serialized_tags, alive_tags = profiler.profiling(tmp_f.name)
+                profiled_code, serialized_tags, alive_tags = profiler.profiling(tmp_f.name, func.call_name)
                 func.function_body = profiled_code
                 func.profile = serialized_tags
                 func.alive_tags = alive_tags
