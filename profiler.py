@@ -346,11 +346,10 @@ return v0; \
                 for env_i in range(len(self.tags[tag_id].tag_envs)):
                     self.tags[tag_id].tag_envs[env_i].is_stable = False
         # serialize tags to json
-        serialized_tags = []
+        serialized_tags = {}
         for tag_id in self.tags:
             tag = self.tags[tag_id]
-            serialized_tags.append({
-                'tag_id': tag_id,
+            serialized_tags[tag_id] = {
                 'tag_str': getattr(tag, 'tag_str', ''),
                 'func_name': getattr(tag, 'func_name', ''),
                 'tag_check_strs': getattr(tag, 'tag_check_strs', []),
@@ -358,7 +357,7 @@ return v0; \
                 'tag_envs': [env.__dict__ for env in getattr(tag, 'tag_envs', [])],
                 'statement_id': getattr(tag, 'statement_id', None),
                 'is_statement': getattr(tag, 'is_statement', False),
-            })
+            }
         code = re.sub(
             r'(?s)\bint\s+main\s*\([^)]*\)\s*\{.*?\}',
             '',
