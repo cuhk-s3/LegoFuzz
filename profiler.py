@@ -278,10 +278,11 @@ return v0; \
         if ret != CMD.OK:
             raise ProfilerError
         
+        self.preprocess_tags(filename, func_name)
+        
         with open(filename, 'r') as f:
             self.src_orig = f.read()
         
-        self.preprocess_tags(filename, func_name)
         self.static_analysis(filename)
         self.add_tags(filename)
 
