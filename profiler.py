@@ -247,11 +247,10 @@ return v0; \
         # profiling
         ret, _ = run_cmd(f"{PROFILER} {filename} -- -I{CSMITH_HOME}/include", DEBUG=self.DEBUG)
         if ret != CMD.OK:
-            raise SynthesizerError
+            raise ProfilerError
         
-        # further synthesis will be based on self.src_syn instead of self.src to avoid heavy removal of useless tags after synthesis.
         with open(filename, 'r') as f:
-            self.src_syn_orig = f.read()
+            self.src_orig = f.read()
         
         self.static_analysis(filename)
         self.add_tags(filename)
@@ -264,11 +263,11 @@ return v0; \
             if ret != CMD.OK:
                 if os.path.exists(exe_out):
                     os.remove(exe_out)
-                raise SynthesizerError
+                raise ProfilerError
             ret, profile_out_1 = run_cmd(exe_out, timeout=3, DEBUG=self.DEBUG)
             if ret != CMD.OK:
                 os.remove(exe_out)
-                raise SynthesizerError
+                raise ProfilerError
             os.remove(exe_out)
         env_re_str = ":".join([':?([-|\d]+)?']*(NUM_ENV)) #@FIXME: no need to have exact NUM_ENV env vars here, now a temp fix is shown below and thus env_re_str is useless.
 
@@ -327,12 +326,12 @@ return v0; \
         code = re.sub(
             r'(?s)\bint\s+main\s*\([^)]*\)\s*\{.*?\}',
             '',
-            self.src_syn_orig
+            self.src_orig
         )
 
         return code, serialized_tags, self.alive_tags
 
-class SynthesizerError(Exception):
+class ProfilerError(Exception):
     pass
 
 if __name__=='__main__':
@@ -362,14 +361,14 @@ if __name__=='__main__':
                 f.write("return 0;\n")
                 f.write("}\n")
 
-            syner = Profiler(DEBUG=False)
+            profiler = Profiler(DEBUG=False)
             try:
-                profiled_code, serialized_tags, alive_tags = syner.profiling(tmp_f.name)
+                profiled_code, serialized_tags, alive_tags = profiler.profiling(tmp_f.name)
                 func.function_body = profiled_code
                 func.profile = serialized_tags
                 func.alive_tags = alive_tags
-            except SynthesizerError:
-                print("SynthesizerError (OK).")
+            except ProfilerError:
+                print("ProfilerError (OK).")
 
     # Write to new function database
     with open(args.DST, 'w') as f:
