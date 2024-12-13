@@ -2,13 +2,19 @@
 A tool for profiling C program and then synthesizing mutants based on the profiled program.
 This is a part of our LLM-based compiler testing tool.
 
-This project is based on [Creal](https://github.com/UniCodeSphere/Creal). 
+This project is based on [Creal](https://github.com/UniCodeSphere/Creal). However, in this tool, 
+we **get rid of Csmith** to synthesize programs by only using the programs in the source database.
 
 ## Usage
 
 **Step 0: Install the dependencies**
 
-Please refer to [Step 1: Install necessary packages](https://github.com/UniCodeSphere/Creal/blob/main/README.md) in Creal.
+- Python >= 3.10
+- CompCert (refer to [CompCert](https://compcert.org/man/manual002.html#install))
+- clang >= 14, libclang-dev
+- diopter == 0.0.24 (`pip install diopter==0.0.24`)
+- termcolor (`pip install termcolor`)
+
 
 **Step 1: Compile the profiler**
 
@@ -45,4 +51,4 @@ $ python3 synthesizer.py --dst <destination dir> --db <source database>
 
 - [x] Rename tags before synthesizing mutants
 
-- [ ] Integrate with the LLM-based compiler testing tool
+- [x] Integrate with the LLM-based compiler testing tool

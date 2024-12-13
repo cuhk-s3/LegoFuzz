@@ -177,9 +177,12 @@ class Synthesizer:
         with open(src_filename, "w") as f:
             f.write(seed_func.function_body)
             f.write("\n")
+            f.write("#include <stdio.h>\n")
+            f.write("#include <inttypes.h>\n")
             f.write("int main() {\n")
-            f.write("{func_name}({func_io});\n".format(func_name=seed_func.call_name, func_io = ','.join(map(str, seed_func.io_list[0][0]))))
-            f.write("return 0;\n")
+            function_call = f'{seed_func.call_name}({",".join(map(str, seed_func.io_list[0][0]))})'
+            f.write(f'    printf("checksum = %\" {VarType.get_format(seed_func.return_type)} \"\\n", {function_call});\n')
+            f.write("    return 0;\n")
             f.write("}\n")
 
         # backup src file

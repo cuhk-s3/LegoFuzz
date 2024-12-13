@@ -16,7 +16,6 @@ CC1 = "gcc" # use two compilers to avoid unspecified behavior
 CC2 = "clang"
 NUM_ENV = 5 # number of env variables used for each tag, "1" means one env_val, e.g., Tag1:tag_val:env_val
 PROFILER = f"{os.path.dirname(__file__)}/profiler/build/bin/profiler --mode=expr"
-CSMITH_HOME = os.environ["CSMITH_HOME"]
 
 INVALID_TAG_VALUE = 111 # we use this value to indicate invalid tag values
 
@@ -185,9 +184,6 @@ class Profiler:
             env_tag_id = tag_id_list[k]
             if self.tags[env_tag_id].tag_var.var_name == curr_tag_var_name:
                 continue
-            #FIXME: this is a work around to avoid using uninitialized i,j,k in csmith generated prgrams
-            if self.tags[env_tag_id].tag_var.var_name in ['i', 'j', 'k']:
-                continue
             if self.valid_scope(from_scope=curr_scope_id, to_scope=self.tags[env_tag_id].tag_var.scope_id):
                 if self.tags[env_tag_id].tag_var.var_name not in env_vars:
                     envs.append(env_tag_id)
@@ -275,7 +271,7 @@ return v0; \
         Note: we would rename tags to Tag{tag_id}_{func_name} before profiling.
         """
         # profiling
-        ret, _ = run_cmd(f"{PROFILER} {filename} -- -I{CSMITH_HOME}/include", DEBUG=self.DEBUG)
+        ret, _ = run_cmd(f"{PROFILER} {filename} --", DEBUG=self.DEBUG)
         if ret != CMD.OK:
             raise ProfilerError
         
@@ -291,7 +287,7 @@ return v0; \
             tmp_f.close()
             exe_out = tmp_f.name
             # run with CC1
-            ret, _ = run_cmd(f"{CC1} -I{CSMITH_HOME}/include -w -O0 {filename} -o {exe_out}", DEBUG=self.DEBUG)
+            ret, _ = run_cmd(f"{CC1} -w -O0 {filename} -o {exe_out}", DEBUG=self.DEBUG)
             if ret != CMD.OK:
                 if os.path.exists(exe_out):
                     os.remove(exe_out)
