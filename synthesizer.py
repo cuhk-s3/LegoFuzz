@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-MAX_CHAIN_NUM = 2 # maximum number of iterations for one synthesis
+MAX_CHAIN_NUM = 100 # maximum number of iterations for one synthesis
 
 class Synthesizer:
     def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
@@ -33,28 +33,17 @@ class Synthesizer:
         return False
 
     def insert_func_decl(self, func_id_list):
-        # locate the last header include
-        headers = re.findall(r'(#include.*)', self.src_syn)
-        if len(headers) == 0:
-            header_end_loc = 0
-        else:
-            header_end_loc = self.src_syn.index(headers[-1]) + len(headers[-1])
         # insert the function declaration 
         for func_id in list(set(func_id_list)):
+            miscs = ""
             for misc in self.functionDB[func_id].misc:
-                if not self.ignore_typedef(misc):
-                    misc = "\n" + misc + "\n"
-                    self.src_syn = self.src_syn[:header_end_loc] + misc + self.src_syn[header_end_loc:]
-                    header_end_loc += len(misc)
+                # For those that failed to be profiled, misc has not been inserted into the function body
+                if misc not in self.functionDB[func_id].function_body:
+                    miscs = miscs + misc + "\n"
 
             function_body = self.functionDB[func_id].function_body
-            #FIXME: the added attribute may be incompatible with existing function attributes from the database. Can use this feature again if attributes are removed from the database.
-            # prob_attr = random.randint(0, 100-1)
-            # if prob_attr > 50:
-            #     function_body = "inline __attribute__((always_inline))\n" + function_body
-            function_body = "\n" + function_body + "\n"
-            self.src_syn = self.src_syn[:header_end_loc] + function_body + self.src_syn[header_end_loc:]
-            header_end_loc += len(function_body)
+            function_body = "\n" + miscs + function_body + "\n"
+            self.src_syn = function_body + self.src_syn
         
     def synthesize_input(self, env_vars:list[Var], func_inp_list:list[str], func_inp_types:list[VarType]):
         """Synthesize input to the target function call with environmental variables"""
@@ -177,7 +166,7 @@ class Synthesizer:
         # randomly select a seed function
         while True:
             seed_func_idx = random.randint(0, len(self.functionDB)-1)
-            if self.functionDB[seed_func_idx].has_io:
+            if self.functionDB[seed_func_idx].has_io and len(self.functionDB[seed_func_idx].profile) > 0:
                 seed_func = self.functionDB[seed_func_idx]
                 break
 
@@ -186,9 +175,6 @@ class Synthesizer:
         succ_file_id = id_generator()
         src_filename = str((dst_dir / f'{succ_file_id}_seed.c').absolute())
         with open(src_filename, "w") as f:
-            for misc in seed_func.misc:
-                f.write(misc)
-                f.write("\n")
             f.write(seed_func.function_body)
             f.write("\n")
             f.write("int main() {\n")
@@ -254,7 +240,7 @@ if __name__=='__main__':
     dst_dir = Path(args.DST)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    syner = Synthesizer(args.DB, prob=100, DEBUG=True)
+    syner = Synthesizer(args.DB, prob=100, DEBUG=False)
     try:
         all_syn_files = syner.synthesizer(dst_dir, num_mutant=1)
     except SynthesizerError:
