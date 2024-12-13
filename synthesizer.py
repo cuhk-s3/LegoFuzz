@@ -192,7 +192,7 @@ class Synthesizer:
 
         # sythesis
         seed_alive_tags = seed_func.alive_tags  # tags that are not replaced by constants
-        all_syn_files = []
+        all_syn_files = [src_filename]
         if len(seed_alive_tags) == 0:
             return all_syn_files
         for num_i in range(num_mutant):
