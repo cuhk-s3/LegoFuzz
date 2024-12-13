@@ -6,6 +6,7 @@ from copy import deepcopy
 import random
 import subprocess as sp
 from enum import Enum, auto
+import tqdm
 
 from functioner import FunctionDB
 from variable import VarType
@@ -352,7 +353,6 @@ return v0; \
             serialized_tags[tag_id] = {
                 'tag_str': getattr(tag, 'tag_str', ''),
                 'func_name': getattr(tag, 'func_name', ''),
-                'tag_check_strs': getattr(tag, 'tag_check_strs', []),
                 'tag_var': getattr(tag, 'tag_var', None).__dict__ if tag.tag_var else {},
                 'tag_envs': [env.__dict__ for env in getattr(tag, 'tag_envs', [])],
                 'statement_id': getattr(tag, 'statement_id', None),
@@ -382,7 +382,8 @@ if __name__=='__main__':
         exit(1)
     
     functionDB = FunctionDB(args.SRC)
-    for func in functionDB.all_functions:
+    with tqdm.tqdm(total=len(functionDB.all_functions)) as pbar:
+        for func in functionDB.all_functions:
             tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
             tmp_f.close
             with open(tmp_f.name, "w") as f:
@@ -396,14 +397,15 @@ if __name__=='__main__':
                 f.write("return 0;\n")
                 f.write("}\n")
 
-            profiler = Profiler(DEBUG=True)
+            profiler = Profiler(DEBUG=False)
             try:
                 profiled_code, serialized_tags, alive_tags = profiler.profiling(tmp_f.name, func.call_name)
                 func.function_body = profiled_code
                 func.profile = serialized_tags
                 func.alive_tags = alive_tags
             except ProfilerError:
-                print("ProfilerError (OK).")
+                pass
+            pbar.update(1)
 
     # Write to new function database
     with open(args.DST, 'w') as f:
