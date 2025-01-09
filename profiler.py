@@ -138,6 +138,7 @@ class Profiler:
             new_var.var_name = tag_var_name
             new_var.var_type = strip_type_str(tag_type_str)
             new_var.is_global = scope_curr_id == 0
+            new_var.is_stable = True
 
             new_tag = Tag()
             new_tag.tag_str = tag_str

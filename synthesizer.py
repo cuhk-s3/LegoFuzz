@@ -52,11 +52,11 @@ class Synthesizer:
             inp_value = int(func_inp_list[inp_i])
             if len(env_vars) > 0:
                 env = random.choice(env_vars)
-                env_value_cast = VarType.get_ctypes(func_inp_types[inp_i], env.var_value).value
+                env_value_cast = VarType.get_ctypes(func_inp_types[inp_i], env['var_value']).value
                 if abs(env_value_cast) > MAX_CONST_CCOMP:
                     new_inp_list.append(f"{inp_value}")
                 else:
-                    new_inp_list.append(f"({VarType.to_str(func_inp_types[inp_i])})({env.var_name})+({inp_value - env_value_cast})")
+                    new_inp_list.append(f"({VarType.to_str(func_inp_types[inp_i])})({env['var_name']})+({inp_value - env_value_cast})")
             else:
                 new_inp_list.append(f"{inp_value}")
         return new_inp_list
@@ -73,14 +73,15 @@ class Synthesizer:
             output_str += f'-({func_out})'
             output = 0
         for env in env_vars:
-            env_value_cast = VarType.get_ctypes(func_return_type, env.var_value).value
+            env_value_cast = VarType.get_ctypes(func_return_type, env['var_value']).value
             if abs(env_value_cast) > MAX_CONST_CCOMP or abs(env_value_cast+output) > MAX_CONST_CCOMP:
                 continue
+            env_var_name = env['var_name']
             if ret_val_min <= env_value_cast+output <= ret_val_max:
-                output_str += f'+({VarType.to_str(func_return_type)})({env.var_name})'
+                output_str += f'+({VarType.to_str(func_return_type)})({env_var_name})'
                 output += env_value_cast
             else:
-                output_str += f'+(({VarType.to_str(func_return_type)})({env.var_name})-({env_value_cast}))'
+                output_str += f'+(({VarType.to_str(func_return_type)})({env_var_name})-({env_value_cast}))'
         return output_str, output
 
     def replace_valuetag_with_func(self, tag_id:str, tgt_func_idx:int):
@@ -91,7 +92,7 @@ class Synthesizer:
         stable_env_vars = []
         if 'is_stable' in self.tags[tag_id]['tag_var']:
             if self.tags[tag_id]['tag_var']['is_stable']:
-                stable_env_vars.append(self.tags[tag_id].tag_var)
+                stable_env_vars.append(self.tags[tag_id]['tag_var'])
         for env in self.tags[tag_id]['tag_envs']:
             if 'is_stable' in env and env['is_stable']:
                 stable_env_vars.append(env)
