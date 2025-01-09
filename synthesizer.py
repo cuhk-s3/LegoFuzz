@@ -145,6 +145,24 @@ class Synthesizer:
         tag_var_name = self.tags[tag_id]['tag_var']['var_name']
         self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/' + func_call + f'/*TAG{tag_id}:END:{tag_var_name}*/')
 
+    def collect_global_vars(self, used_func:list[int]):
+        """
+        Collect global variables from used functions
+        """
+        global_vars = []
+        variable_pattern = re.compile(r'\b(?:int|long|char|short|unsigned|signed)\s+(\w+)\s*=')
+        for func_idx in used_func:
+            for var in self.functionDB[func_idx].misc:
+                # `misc` may have the following format:
+                # int a = 1;
+                # long b = 2;
+                # We need to extract the variable name
+                match = variable_pattern.match(var.strip())
+                if match:
+                    variable_name = match.group(1)
+                    global_vars.append("transparent_crc({variable_name}, \"{variable_name}\", print_hash_value);")
+        return global_vars
+
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
         """
         Synthesize functions for tags in the target function
@@ -183,14 +201,6 @@ class Synthesizer:
         src_filename = str((dst_dir / f'{succ_file_id}_seed.c').absolute())
         with open(src_filename, "w") as f:
             f.write(seed_func.function_body)
-            f.write("\n")
-            f.write("#include <stdio.h>\n")
-            f.write("#include <inttypes.h>\n")
-            f.write("int main() {\n")
-            function_call = f'{seed_func.call_name}({",".join(map(str, seed_func.io_list[0][0]))})'
-            f.write(f'    printf("checksum = %\" {VarType.get_format(seed_func.return_type)} \"\\n", {function_call});\n')
-            f.write("    return 0;\n")
-            f.write("}\n")
 
         # backup src file
         tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
@@ -223,8 +233,24 @@ class Synthesizer:
                     replaced_tags[synth_func] = []
                 self.insert_func_decl(synth_funcs)
             dst_filename = f'{os.path.splitext(src_filename)[0]}_syn{num_i}.c'
+            global_vars = self.collect_global_vars(used_func)
             with open(dst_filename, "w") as f:
+                f.write("#include <csmith.h>")
                 f.write(self.src_syn)
+                f.write("\n")
+                f.write("#include <stdio.h>\n")
+                f.write("#include <inttypes.h>\n")
+                f.write("int main() {\n")
+                f.write("    int print_hash_value = 0;\n")
+                f.write("    platform_main_begin();\n")
+                f.write("    crc32_gentab();\n")
+                function_call = f'{seed_func.call_name}({",".join(map(str, seed_func.io_list[0][0]))})'
+                f.write(f'    transparent_crc({function_call}, \"{function_call}\", print_hash_value);\n')
+                for var in global_vars:
+                    f.write(f'    {var}\n')
+                f.write("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
+                f.write("    return 0;\n")
+                f.write("}\n")
             all_syn_files.append(dst_filename)
             if self.DEBUG:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant end", num_i, flush=True)
