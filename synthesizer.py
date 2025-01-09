@@ -36,9 +36,15 @@ class Synthesizer:
         # insert the function declaration 
         for func_id in list(set(func_id_list)):
             miscs = ""
+            profiled = True
             for misc in self.functionDB[func_id].misc:
                 # For those that failed to be profiled, misc has not been inserted into the function body
                 if misc not in self.functionDB[func_id].function_body:
+                    profiled = False
+                    break
+            
+            if not profiled:
+                for misc in self.functionDB[func_id].misc:
                     miscs = miscs + misc + "\n"
 
             function_body = self.functionDB[func_id].function_body

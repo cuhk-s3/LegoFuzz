@@ -406,4 +406,4 @@ if __name__=='__main__':
 
     # Write to new function database
     with open(args.DST, 'w') as f:
-        f.write(json.dumps([func.to_json() for func in functionDB.all_functions], indent=4))
+        f.write(json.dumps([func.to_json() for func in functionDB.all_functions]))
