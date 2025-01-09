@@ -160,7 +160,7 @@ class Synthesizer:
                 match = variable_pattern.match(var.strip())
                 if match:
                     variable_name = match.group(1)
-                    global_vars.append("transparent_crc({variable_name}, \"{variable_name}\", print_hash_value);")
+                    global_vars.append(f"transparent_crc({variable_name}, \"{variable_name}\", print_hash_value);")
         return global_vars
 
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
