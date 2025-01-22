@@ -165,6 +165,11 @@ class Synthesizer:
             synth_funcs.append(synth_func_idx)
             used_func.append(synth_func_idx)
         return synth_funcs
+    
+    def mutate_with_functions(self, function_idx):
+        func = self.functionDB[function_idx]
+        func_call = func.call_name + "(" + ",".join(map(str, func.io_list[0][0])) + ")"
+        return f'    transparent_crc({func_call}, "{func_call}", print_hash_value);\n'
 
     def synthesizer(self, dst_dir:Path, num_mutant:int=1):
         """
@@ -202,12 +207,15 @@ class Synthesizer:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant start", num_i, flush=True)
             self.src_syn = copy(self.src_orig)
             used_func = [seed_func_idx]
+            tgt_func = []
             replaced_tags = {seed_func_idx: []} # a dict that contains the replaced tags of used functions(ready to be tgts)
             repeat_time = random.randint(MAX_CHAIN_NUM // 2, MAX_CHAIN_NUM)
             for _ in range(repeat_time):
                 tgt_func_idx = random.choice(used_func)
                 self.tags = self.functionDB[tgt_func_idx].profile
                 synth_funcs = self.synthesize_one(tgt_func_idx, used_func, replaced_tags)
+                if synth_funcs != []:
+                    tgt_func.append(tgt_func_idx)
                 if self.DEBUG:
                     print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "synth_funcs", synth_funcs)
                 # update replaced_tags
@@ -215,6 +223,9 @@ class Synthesizer:
                     replaced_tags[synth_func] = []
                 self.insert_func_decl(synth_funcs)
             dst_filename = f'{os.path.splitext(src_filename)[0]}_syn{num_i}.c'
+            calls = []
+            for idx in tgt_func:
+                calls.append(self.mutate_with_functions(idx))
             with open(dst_filename, "w") as f:
                 f.write("#include <csmith.h>")
                 f.write(self.src_syn)
@@ -225,8 +236,8 @@ class Synthesizer:
                 f.write("    int print_hash_value = 0;\n")
                 f.write("    platform_main_begin();\n")
                 f.write("    crc32_gentab();\n")
-                function_call = f'{seed_func.call_name}({",".join(map(str, seed_func.io_list[0][0]))})'
-                f.write(f'    transparent_crc({function_call}, \"{function_call}\", print_hash_value);\n')
+                for call in calls:
+                    f.write(call)
                 f.write("    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n")
                 f.write("    return 0;\n")
                 f.write("}\n")
