@@ -168,7 +168,8 @@ class Synthesizer:
     
     def mutate_with_functions(self, function_idx):
         func = self.functionDB[function_idx]
-        func_call = func.call_name + "(" + ",".join(map(str, func.io_list[0][0])) + ")"
+        io_idx = random.choice(range(1, len(func.io_list)))
+        func_call = func.call_name + "(" + ",".join(map(str, func.io_list[io_idx][0])) + ")"
         return f'    transparent_crc({func_call}, "{func_call}", print_hash_value);\n'
 
     def synthesizer(self, dst_dir:Path, num_mutant:int=1):
@@ -226,6 +227,7 @@ class Synthesizer:
             calls = []
             for idx in tgt_func:
                 calls.append(self.mutate_with_functions(idx))
+            calls.reverse()
             with open(dst_filename, "w") as f:
                 f.write("#include <csmith.h>")
                 f.write(self.src_syn)
