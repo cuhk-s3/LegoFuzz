@@ -16,13 +16,13 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
 
 def generate_int_global_var():
     global_var_name = 'g_' + id_generator()
-    global_var_value = random.randint(-2**31, 2**31-1)
+    global_var_value = random.randint(-128, 127)
     return global_var_name, global_var_value
 
 def generate_array_global_var():
     global_arr_name = 'g_' + id_generator()
     global_arr_size = random.randint(1, 10)
-    global_arr_value = [random.randint(-2**31, 2**31-1) for _ in range(global_arr_size)]
+    global_arr_value = [random.randint(-128, 127) for _ in range(global_arr_size)]
     return global_arr_name, global_arr_value
 
 MAX_CHAIN_NUM = 100 # maximum number of iterations for one synthesis
@@ -181,12 +181,11 @@ class Synthesizer:
             if tag_id in replaced_tags[tgt_func_idx]:
                 continue
             if random.randint(0, 100) > self.prob:
-                continue
-            else:
                 if random.randint(0, 1) == 0:
-                    global_var_idx = random.randint(0, len(GLOBAL_VARS)-1)
-                    self.replace_valuetag_with_global_var(str(tag_id), global_var_idx)
-                    continue
+                    if self.tags[str(tag_id)]['tag_var']['var_type'] != 'void':
+                        global_var_idx = random.randint(0, len(GLOBAL_VARS)-1)
+                        self.replace_valuetag_with_global_var(str(tag_id), global_var_idx)
+                continue
             while True:
                 synth_func_idx = random.randint(0, len(self.functionDB)-1)
                 if self.functionDB[synth_func_idx].has_io and synth_func_idx not in used_func:
@@ -283,10 +282,11 @@ class Synthesizer:
             with open(dst_filename, "w") as f:
                 f.write("/* -----Global Variables----- */\n")
                 for idx in GLOBAL_VARS:
+                    keyword = "static" if random.randint(0, 1) == 0 else ""
                     if GLOBAL_VARS[idx]['var_type'] == 'int':
-                        f.write(f"static int {GLOBAL_VARS[idx]['var_name']} = {GLOBAL_VARS[idx]['var_value']};\n")
+                        f.write(f"{keyword} int {GLOBAL_VARS[idx]['var_name']} = {GLOBAL_VARS[idx]['var_value']};\n")
                     else:
-                        f.write(f"static int {GLOBAL_VARS[idx]['var_name']}[{len(GLOBAL_VARS[idx]['var_value'])}] = {{")
+                        f.write(f"{keyword} int {GLOBAL_VARS[idx]['var_name']}[{len(GLOBAL_VARS[idx]['var_value'])}] = {{")
                         f.write(", ".join(map(str, GLOBAL_VARS[idx]['var_value'])))
                         f.write("};\n")
                 f.write("\n")
