@@ -113,31 +113,13 @@ class Synthesizer:
             print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "new_output_str", new_output_str, "new_output", new_output)
 
         # synthesize func_call for expr, make sure to restore the value of the expr
-        if not self.tags[tag_id]['is_statement']:
-            func_call = "(({tag_type})({call_name}({input}){output})+{tag_var_value})".format(
-                tag_type=self.tags[tag_id]['tag_var']['var_type'], 
-                call_name=self.functionDB[tgt_func_idx].call_name, 
-                input=", ".join(new_input_str), 
-                output=f"{new_output_str}-({new_output})",
-                tag_var_value=self.tags[tag_id]['tag_var']['var_name'],
-            )
-        # for statement tag, we also want to assign the function call to a stable env variable
-        else:
-            func_call = "({call_name}({input}){output})".format(
-                call_name=self.functionDB[tgt_func_idx].call_name, 
-                input=",".join(new_input_str), 
-                output=new_output_str
-            )
-            restore_env = None
-            if not self.tags[tag_id]['tag_var']['is_constant']:
-                restore_env = self.tags[tag_id]['tag_var']
-            elif len(stable_env_vars) > 0:
-                restore_env = random.choice(stable_env_vars)
-            if restore_env is not None and not restore_env['is_constant']:
-                var_name = restore_env['var_name']
-                var_type = restore_env['var_type']
-                var_value = restore_env['var_value']
-                func_call = f'{var_name} = ({var_type})({func_call}-({new_output}))+({var_value});'
+        func_call = "(({tag_type})({call_name}({input}){output})+{tag_var_value})".format(
+            tag_type=self.tags[tag_id]['tag_var']['var_type'], 
+            call_name=self.functionDB[tgt_func_idx].call_name, 
+            input=", ".join(new_input_str), 
+            output=f"{new_output_str}-({new_output})",
+            tag_var_value=self.tags[tag_id]['tag_var']['var_name'],
+        )
         if self.DEBUG:
             print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "func_call", func_call)
         # insert the function call
