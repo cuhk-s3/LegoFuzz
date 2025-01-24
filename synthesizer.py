@@ -268,7 +268,7 @@ if __name__=='__main__':
     dst_dir = Path(args.DST)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    syner = Synthesizer(args.DB, prob=100, DEBUG=False)
+    syner = Synthesizer(args.DB, prob=80, DEBUG=False)
     try:
         all_syn_files = syner.synthesizer(dst_dir, num_mutant=1)
     except SynthesizerError:
