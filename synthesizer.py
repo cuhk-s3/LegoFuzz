@@ -198,7 +198,10 @@ class Synthesizer:
     
     def mutate_with_functions(self, function_idx):
         func = self.functionDB[function_idx]
-        io_idx = random.choice(range(1, len(func.io_list)))
+        if len(func.io_list) == 1:
+            io_idx = 0
+        else: 
+            io_idx = random.choice(range(1, len(func.io_list)))
         func_call = func.call_name + "(" + ",".join(map(str, func.io_list[io_idx][0])) + ")"
         return f'    transparent_crc({func_call}, "{func_call}", print_hash_value);\n'
     
