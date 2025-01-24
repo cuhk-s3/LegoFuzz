@@ -14,7 +14,19 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
+def generate_int_global_var():
+    global_var_name = 'g_' + id_generator()
+    global_var_value = random.randint(-2**31, 2**31-1)
+    return global_var_name, global_var_value
+
+def generate_array_global_var():
+    global_arr_name = 'g_' + id_generator()
+    global_arr_size = random.randint(1, 10)
+    global_arr_value = [random.randint(-2**31, 2**31-1) for _ in range(global_arr_size)]
+    return global_arr_name, global_arr_value
+
 MAX_CHAIN_NUM = 100 # maximum number of iterations for one synthesis
+GLOBAL_VARS = {}
 
 class Synthesizer:
     def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
@@ -153,6 +165,26 @@ class Synthesizer:
         io_idx = random.choice(range(1, len(func.io_list)))
         func_call = func.call_name + "(" + ",".join(map(str, func.io_list[io_idx][0])) + ")"
         return f'    transparent_crc({func_call}, "{func_call}", print_hash_value);\n'
+    
+    def synthesize_global_variables(self, num:int=10):
+        """
+        Synthesize global variables
+        """
+        for idx in range(num):
+            if random.randint(0, 1) == 0:
+                global_var_name, global_var_value = generate_int_global_var()
+                GLOBAL_VARS[idx] = {
+                    'var_name': global_var_name,
+                    'var_type': 'int',
+                    'var_value': global_var_value
+                }
+            else:
+                global_arr_name, global_arr_value = generate_array_global_var()
+                GLOBAL_VARS[idx] = {
+                    'var_name': global_arr_name,
+                    'var_type': 'int[]',
+                    'var_value': global_arr_value
+                }
 
     def synthesizer(self, dst_dir:Path, num_mutant:int=1):
         """
@@ -181,6 +213,7 @@ class Synthesizer:
         os.remove(tmp_f.name)
 
         # sythesis
+        self.synthesize_global_variables()
         seed_alive_tags = seed_func.alive_tags  # tags that are not replaced by constants
         all_syn_files = [src_filename]
         if len(seed_alive_tags) == 0:
@@ -211,6 +244,15 @@ class Synthesizer:
                 calls.append(self.mutate_with_functions(idx))
             calls.reverse()
             with open(dst_filename, "w") as f:
+                f.write("/* -----Global Variables----- */\n")
+                for idx in GLOBAL_VARS:
+                    if GLOBAL_VARS[idx]['var_type'] == 'int':
+                        f.write(f"static int {GLOBAL_VARS[idx]['var_name']} = {GLOBAL_VARS[idx]['var_value']};\n")
+                    else:
+                        f.write(f"static int {GLOBAL_VARS[idx]['var_name']}[{len(GLOBAL_VARS[idx]['var_value'])}] = {{")
+                        f.write(", ".join(map(str, GLOBAL_VARS[idx]['var_value'])))
+                        f.write("};\n")
+                f.write("\n")
                 f.write("#include <csmith.h>")
                 f.write(self.src_syn)
                 f.write("\n")
