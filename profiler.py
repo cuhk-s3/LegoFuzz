@@ -47,7 +47,6 @@ class Tag:
     tag_var:Var                 # tagged variable
     tag_envs:list[Var]          # env vairales
     statement_id:int            # id of the statement that the Tag belongs to
-    is_statement:bool = False   # if this tag is a stand-alone statement
 
 class ScopeTree:
     def __init__(self, id:int) -> None:
@@ -143,7 +142,6 @@ class Profiler:
             new_tag = Tag()
             new_tag.tag_str = tag_str
             new_tag.func_name = func_name
-            new_tag.is_statement = tag_style == 's'
             new_tag.tag_var = new_var
             new_tag.tag_envs = []
             new_tag.statement_id = int(stmt_id)
@@ -353,7 +351,6 @@ return v0; \
                 'tag_var': getattr(tag, 'tag_var', None).__dict__ if tag.tag_var else {},
                 'tag_envs': [env.__dict__ for env in getattr(tag, 'tag_envs', [])],
                 'statement_id': getattr(tag, 'statement_id', None),
-                'is_statement': getattr(tag, 'is_statement', False),
             }
         code = re.sub(
             r'(?s)\bint\s+main\s*\([^)]*\)\s*\{.*?\}',
