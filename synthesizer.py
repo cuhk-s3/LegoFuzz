@@ -138,6 +138,36 @@ class Synthesizer:
         tag_str = self.tags[tag_id]['tag_str']
         tag_var_name = self.tags[tag_id]['tag_var']['var_name']
         self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/' + func_call + f'/*TAG{tag_id}:END:{tag_var_name}*/')
+    
+    def replace_valuetag_with_global_var(self, tag_id:str, global_var_idx:int):
+        """
+        Replace a ValueTag with a global variable
+        """
+        stable_env_vars = []
+        if 'is_stable' in self.tags[tag_id]['tag_var']:
+            if self.tags[tag_id]['tag_var']['is_stable']:
+                stable_env_vars.append(self.tags[tag_id]['tag_var'])
+        for env in self.tags[tag_id]['tag_envs']:
+            if 'is_stable' in env and env['is_stable']:
+                stable_env_vars.append(env)
+
+        global_var_name = GLOBAL_VARS[global_var_idx]['var_name']
+        if GLOBAL_VARS[global_var_idx]['var_type'] == 'int':
+            global_var_value = GLOBAL_VARS[global_var_idx]['var_value']
+        else:
+            idx = random.randint(0, len(GLOBAL_VARS[global_var_idx]['var_value'])-1)
+            global_var_name = f"{global_var_name}[{idx}]"
+            global_var_value = GLOBAL_VARS[global_var_idx]['var_value'][idx]
+
+        replaced_var = "({tag_var_name}) + ({global_var_name}) - {global_var_value}".format(
+            tag_var_name=self.tags[tag_id]['tag_var']['var_name'],
+            global_var_name=global_var_name,
+            global_var_value=global_var_value
+        )
+
+        tag_str = self.tags[tag_id]['tag_str']
+        tag_var_name = self.tags[tag_id]['tag_var']['var_name']
+        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/' + replaced_var + f'/*TAG{tag_id}:END:{tag_var_name}*/')
 
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
         """
@@ -148,8 +178,15 @@ class Synthesizer:
         for tag_id in tgt_func.alive_tags:
             if len(used_func) == len(self.functionDB):
                 break
-            if tag_id in replaced_tags[tgt_func_idx] or random.randint(0, 100) > self.prob:
+            if tag_id in replaced_tags[tgt_func_idx]:
                 continue
+            if random.randint(0, 100) > self.prob:
+                continue
+            else:
+                if random.randint(0, 1) == 0:
+                    global_var_idx = random.randint(0, len(GLOBAL_VARS)-1)
+                    self.replace_valuetag_with_global_var(str(tag_id), global_var_idx)
+                    continue
             while True:
                 synth_func_idx = random.randint(0, len(self.functionDB)-1)
                 if self.functionDB[synth_func_idx].has_io and synth_func_idx not in used_func:
@@ -253,6 +290,7 @@ class Synthesizer:
                         f.write(", ".join(map(str, GLOBAL_VARS[idx]['var_value'])))
                         f.write("};\n")
                 f.write("\n")
+                f.write("/* -----Synthesized Function----- */\n")
                 f.write("#include <csmith.h>")
                 f.write(self.src_syn)
                 f.write("\n")
