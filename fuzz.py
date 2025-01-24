@@ -266,7 +266,7 @@ if __name__=='__main__':
     SAVE_DIR = Path(__file__).parent / "work/wrong"
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     compilers = parse_compilers(sys.argv[1])
-    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=100, DEBUG=DEBUG)
+    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=80, DEBUG=DEBUG)
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while 1:
