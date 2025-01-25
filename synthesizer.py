@@ -143,13 +143,8 @@ class Synthesizer:
         """
         Replace a ValueTag with a global variable
         """
-        stable_env_vars = []
-        if 'is_stable' in self.tags[tag_id]['tag_var']:
-            if self.tags[tag_id]['tag_var']['is_stable']:
-                stable_env_vars.append(self.tags[tag_id]['tag_var'])
-        for env in self.tags[tag_id]['tag_envs']:
-            if 'is_stable' in env and env['is_stable']:
-                stable_env_vars.append(env)
+        tag_type = VarType.from_str(self.tags[tag_id]['tag_var']['var_type'])
+        tag_val_min, tag_val_max = VarType.get_range(tag_type)
 
         global_var_name = GLOBAL_VARS[global_var_idx]['var_name']
         if GLOBAL_VARS[global_var_idx]['var_type'] == 'int':
@@ -158,6 +153,12 @@ class Synthesizer:
             idx = random.randint(0, len(GLOBAL_VARS[global_var_idx]['var_value'])-1)
             global_var_name = f"{global_var_name}[{idx}]"
             global_var_value = GLOBAL_VARS[global_var_idx]['var_value'][idx]
+
+        if not (tag_val_min <= global_var_value <= tag_val_max):
+            return
+        tag_val = self.tags[tag_id]['tag_var']['var_value']
+        if not (tag_val_min <= int(tag_val) + global_var_value <= tag_val_max):
+            return
 
         replaced_var = "({tag_var_name}) + ({global_var_name}) - {global_var_value}".format(
             tag_var_name=self.tags[tag_id]['tag_var']['var_name'],
