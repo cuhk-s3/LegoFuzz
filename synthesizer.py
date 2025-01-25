@@ -143,6 +143,16 @@ class Synthesizer:
         """
         Replace a ValueTag with a global variable
         """
+        stable_env_vars = []
+        if 'is_stable' in self.tags[tag_id]['tag_var']:
+            if self.tags[tag_id]['tag_var']['is_stable']:
+                stable_env_vars.append(self.tags[tag_id]['tag_var'])
+        for env in self.tags[tag_id]['tag_envs']:
+            if 'is_stable' in env and env['is_stable']:
+                stable_env_vars.append(env)
+
+        tag_name = self.tags[tag_id]['tag_var']['var_name']
+        tag_val = self.tags[tag_id]['tag_var']['var_value']
         tag_type = VarType.from_str(self.tags[tag_id]['tag_var']['var_type'])
         tag_val_min, tag_val_max = VarType.get_range(tag_type)
 
@@ -154,9 +164,27 @@ class Synthesizer:
             global_var_name = f"{global_var_name}[{idx}]"
             global_var_value = GLOBAL_VARS[global_var_idx]['var_value'][idx]
 
+        # Global variable write 
+        global_val_min, global_val_max = VarType.get_range(VarType.INT32) # we now only have int global variables
+        global_write_str = f'{global_var_name} = {global_var_value}' 
+        for env in stable_env_vars:
+            env_var_name = env['var_name']
+            env_value_cast = VarType.get_ctypes(tag_type, env['var_value']).value
+            if abs(env_value_cast) > MAX_CONST_CCOMP or abs(env_value_cast+global_var_value) > MAX_CONST_CCOMP:
+                continue
+            if not(global_val_min <= env_value_cast <= global_val_max):
+                continue
+            global_write_str += f' + ({env_var_name} - ({env_value_cast}))'
+        global_write_str += ';'
+
+        statement_id = self.tags[tag_id]['statement_id']
+        pattern = rf"(/\*bef_stmt:{statement_id}\*/.*?{tag_name}.*?)(/\*aft_stmt:{statement_id}\*/)"
+        replacement = lambda match: f"{match.group(1)}{global_write_str}\n{match.group(2)}"
+        self.src_syn = re.sub(pattern, replacement, self.src_syn, count=1, flags=re.DOTALL)
+        
+        # Global variable read
         if not (tag_val_min <= global_var_value <= tag_val_max):
             return
-        tag_val = self.tags[tag_id]['tag_var']['var_value']
         if not (tag_val_min <= int(tag_val) + global_var_value <= tag_val_max):
             return
 
@@ -167,8 +195,7 @@ class Synthesizer:
         )
 
         tag_str = self.tags[tag_id]['tag_str']
-        tag_var_name = self.tags[tag_id]['tag_var']['var_name']
-        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/(' + replaced_var + f')/*TAG{tag_id}:END:{tag_var_name}*/')
+        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/(' + replaced_var + f')/*TAG{tag_id}:END:{tag_name}*/')
 
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
         """
