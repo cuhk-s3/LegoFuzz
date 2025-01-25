@@ -25,7 +25,7 @@ def generate_array_global_var():
     global_arr_value = [random.randint(-128, 127) for _ in range(global_arr_size)]
     return global_arr_name, global_arr_value
 
-MAX_CHAIN_NUM = 100 # maximum number of iterations for one synthesis
+MAX_CHAIN_NUM = 200 # maximum number of iterations for one synthesis
 GLOBAL_VARS = {}
 
 class Synthesizer:
@@ -178,7 +178,7 @@ class Synthesizer:
         global_write_str += ';'
 
         statement_id = self.tags[tag_id]['statement_id']
-        pattern = rf"(/\*bef_stmt:{statement_id}\*/.*?{tag_name}.*?)(/\*aft_stmt:{statement_id}\*/)"
+        pattern = rf"(/\*bef_stmt:{statement_id}\*/.*?{re.escape(tag_name)}.*?)(/\*aft_stmt:{statement_id}\*/)"
         replacement = lambda match: f"{match.group(1)}{global_write_str}\n{match.group(2)}"
         self.src_syn = re.sub(pattern, replacement, self.src_syn, count=1, flags=re.DOTALL)
         
