@@ -167,7 +167,7 @@ class Synthesizer:
 
         tag_str = self.tags[tag_id]['tag_str']
         tag_var_name = self.tags[tag_id]['tag_var']['var_name']
-        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/' + replaced_var + f'/*TAG{tag_id}:END:{tag_var_name}*/')
+        self.src_syn = self.src_syn.replace(tag_str, f'/*TAG{tag_id}:STA*/(' + replaced_var + f')/*TAG{tag_id}:END:{tag_var_name}*/')
 
     def synthesize_one(self, tgt_func_idx:int, used_func:list[int], replaced_tags:dict[int, list[int]]):
         """
