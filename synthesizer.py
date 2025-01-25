@@ -178,7 +178,7 @@ class Synthesizer:
         global_write_str += ';'
 
         statement_id = self.tags[tag_id]['statement_id']
-        pattern = rf"(/\*bef_stmt:{statement_id}\*/.*?{tag_name}.*?)(/\*aft_stmt:{statement_id}\*/)"
+        pattern = rf"(/\*bef_stmt:{statement_id}\*/.*?{re.escape(tag_name)}.*?)(/\*aft_stmt:{statement_id}\*/)"
         replacement = lambda match: f"{match.group(1)}{global_write_str}\n{match.group(2)}"
         self.src_syn = re.sub(pattern, replacement, self.src_syn, count=1, flags=re.DOTALL)
         
