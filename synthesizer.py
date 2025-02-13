@@ -224,6 +224,15 @@ class Synthesizer:
             used_func.append(synth_func_idx)
         return synth_funcs
     
+    def mutate_with_global_vars(self):
+        calls = []
+        for var in GLOBAL_VARS:
+            if GLOBAL_VARS[var]['var_type'] == 'int':
+                calls.append(f'    transparent_crc({GLOBAL_VARS[var]["var_name"]}, "{GLOBAL_VARS[var]["var_name"]}", print_hash_value);\n')
+            else:
+                calls.append(f'    for (int i = 0; i < {len(GLOBAL_VARS[var]["var_value"])}; i++) transparent_crc({GLOBAL_VARS[var]["var_name"]}[i], "{GLOBAL_VARS[var]["var_name"]}[i]", print_hash_value);\n')
+        return calls
+        
     def mutate_with_functions(self, function_idx):
         func = self.functionDB[function_idx]
         func_call = func.call_name + "(" + ",".join(map(str, func.io_list[0][0])) + ")"
@@ -303,6 +312,7 @@ class Synthesizer:
                 self.insert_func_decl(synth_funcs)
             dst_filename = f'{os.path.splitext(src_filename)[0]}_syn{num_i}.c'
             calls = []
+            calls.extend(self.mutate_with_global_vars())
             for idx in tgt_func:
                 calls.append(self.mutate_with_functions(idx))
             calls.reverse()
