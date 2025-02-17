@@ -15,7 +15,7 @@ from diopter.compiler import (
 from diopter.sanitizer import Sanitizer
 from diopter.utils import TempDirEnv
 import subprocess as sp
-from synthesizer import Synthesizer
+from synthesize import Synthesizer
 from utils.compcert import CComp as this_CComp
 from pathlib import Path
 

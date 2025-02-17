@@ -8,8 +8,8 @@ import subprocess as sp
 from enum import Enum, auto
 import tqdm
 
-from functioner import FunctionDB
-from variable import VarType
+from databaseconstructor.functioner import FunctionDB
+from databaseconstructor.variable import VarType
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 CC1 = "gcc" # use two compilers to avoid unspecified behavior

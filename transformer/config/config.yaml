@@ -1,0 +1,124 @@
+LLMModel:
+  TOGETHER_AI: "together_ai"
+  OPEN_AI: "open_ai"
+  DEEPSEEK_AI: "deepseek_ai"
+
+MODEL_NAME:
+  together_ai: "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+  open_ai: "gpt-4o-mini"
+  deepseek_ai: "deepseek-chat"
+
+MAX_TOKENS: 512
+TEMPERATURE: 0.7
+TOP_P: 0.7
+TOP_K: 50
+REPETITION_PENALTY: 1
+STOP:
+  - "</s>"
+  - "[INST]"
+
+MAX_THREADS: 100
+
+PROMPT_ROLE: |
+  You are an expert in converting complex C programs into a single, standalone C function.
+  Your role is to analyze the given C program, understand its logic in depth, and transform it into one self-contained C function that preserves the original behavior while adhering to all specified constraints.
+
+PROMPT_CODE: |
+  Convert the given C program to one single compilable C function that takes integer inputs and returns an integer:
+  ```c
+  {code_snippet}
+  ```
+  ### **Steps:**
+  1. **Extract definitions**: Identify and extract all preprocessor definitions and typedefs.
+  2. **Extract type declarations**: Identify forward declarations and struct definitions.
+  3. **Process variables and functions**: Identify all variable declarations and function signatures.
+  4. **Merge logic**: Inline all function implementations into one single function.
+  5. **Final verification**: Ensure the final function takes only plain integer inputs.
+
+  ### Instructions:
+  - Ensure explicit integer-only I/O.
+  - Generate exactly one function.
+  - Preserve all logic.
+  - Ensure compatibility.
+  - No standard I/O functions.
+  - Avoid undefined behavior.
+
+  ### Example of Incorrect Conversion:
+  ------------------- Original -------------------
+  /* Variables and functions */
+  int iwl_trans_write8(struct iwl_trans*, int, int);
+  int trace_iwlwifi_dev_iowrite8(int, int, int);
+  
+  __attribute__((used)) static inline void iwl_write8(struct iwl_trans *trans, u32 ofs, u8 val) {
+      trace_iwlwifi_dev_iowrite8(trans->dev, ofs, val);
+      iwl_trans_write8(trans, ofs, val);
+  }
+
+  ------------------- **Incorrect Transformed** -------------------
+  #include <stdlib.h>
+  struct iwl_trans {
+      int dev;
+  };
+  void iwl_trans_write8(struct iwl_trans *trans, unsigned int ofs, unsigned char val) {
+      // Placeholder for the actual write operation
+  }
+  void trace_iwlwifi_dev_iowrite8(int dev, unsigned int ofs, unsigned char val) {
+      // Placeholder for the actual tracing operation
+  }
+  int iwl_write8(int dev, unsigned int ofs, unsigned char val) {
+      struct iwl_trans trans;
+      trans.dev = dev;
+      trace_iwlwifi_dev_iowrite8(trans.dev, ofs, val);
+      iwl_trans_write8(&trans, ofs, val);
+      return 0;
+  }
+
+  ### Example of Correct Conversion:
+  -------------------Original-------------------
+  #define NULL ((void*)0)
+  typedef unsigned long size_t;
+  typedef long intptr_t; typedef unsigned long uintptr_t;
+  typedef long scalar_t__;
+  typedef int bool;
+  #define false 0
+  #define true 1
+
+  typedef struct TYPE_4__ TYPE_1__;
+
+  struct TYPE_4__ { scalar_t__ nalloc; scalar_t__ len; char* body; };
+  typedef TYPE_1__ Buffer;
+
+  int realloc_body(TYPE_1__*);
+
+  void buf_write(Buffer *b, char c) {
+      if (b->nalloc == (b->len + 1))
+          realloc_body(b);
+      b->body[b->len++] = c;
+  }
+
+  -------------------Transformed-------------------
+  #include <stdlib.h>
+
+  typedef struct {
+      size_t nalloc;
+      size_t len;
+      char *body;
+  } Buffer;
+
+  int buf_write(int nalloc, int len, char *body, char c) {
+      Buffer b;
+      b.nalloc = nalloc;
+      b.len = len;
+      b.body = body;
+
+      if (b.nalloc == (b.len + 1)) {
+          b.nalloc *= 2;
+          b.body = realloc(b.body, b.nalloc);
+      }
+
+      b.body[b.len++] = c;
+      return b.len;
+  }
+
+  ### Final Requirement:
+  Provide only the correctly transformed function without any explanations or comments. Ensure the output adheres strictly to all the above instructions.

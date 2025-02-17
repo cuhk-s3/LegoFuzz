@@ -11,8 +11,6 @@ class Function:
     return_type = ''
     function_body = ''
     io_list = []
-    profile = []
-    alive_tags = []
     misc = []
     src_file = ''
     include_headers = []
@@ -44,10 +42,6 @@ class Function:
         if 'io_list' in func_json:
             self.set_io(func_json['io_list'])
         self.is_valid = True
-        if 'profile' in func_json:
-            self.profile = func_json['profile']
-        if 'alive_tags' in func_json:
-            self.alive_tags = func_json['alive_tags']
         if 'misc' in func_json:
             self.misc = func_json['misc']
         if 'src_file' in func_json:
@@ -65,8 +59,6 @@ class Function:
             "return_type": VarType.to_str(self.return_type),
             "function": self.function_body,
             "io_list": self.io_list,
-            "profile": self.profile,
-            "alive_tags": self.alive_tags,
             "misc": self.misc,
             "src_file": self.src_file,
             "include_headers": self.include_headers,
