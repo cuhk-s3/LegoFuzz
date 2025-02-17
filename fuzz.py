@@ -27,12 +27,16 @@ COMPILER_TIMEOUT = 200
 PROG_TIMEOUT = 10
 CCOMP_TIMEOUT = 60 # compcert timeout
 """TOOL"""
+CSMITH_HOME = os.environ["CSMITH_HOME"]
 CC = CompilationSetting(
             compiler=CompilerExe.get_system_gcc(),
             opt_level=OptLevel.O3,
+            flags=("-march=native",f"-I{CSMITH_HOME}/include"),
             )
 SAN_SAN = Sanitizer(checked_warnings=False, use_ub_address_sanitizer=True, use_ccomp_if_available=False, debug=DEBUG) # sanitizers only
 SAN_CCOMP = this_CComp.get_system_ccomp() # CompCert only
+
+
 """Global vars"""
 
 WORK_DIR = "work"
@@ -140,7 +144,7 @@ def compile_and_run(compiler, src):
     tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
     tmp_f.close()
     exe = tmp_f.name
-    cmd = f"{compiler} {src} -o {exe}"
+    cmd = f"{compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
     ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
     if ret == 124: # another compile chance when timeout
         time.sleep(1)
@@ -262,7 +266,7 @@ if __name__=='__main__':
     SAVE_DIR = Path(__file__).parent / "work/wrong"
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     compilers = parse_compilers(sys.argv[1])
-    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=100, DEBUG=DEBUG)
+    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=80, DEBUG=DEBUG)
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while 1:

@@ -52,3 +52,7 @@ $ python3 synthesizer.py --dst <destination dir> --db <source database>
 - [x] Rename tags before synthesizing mutants
 
 - [x] Integrate with the LLM-based compiler testing tool
+
+- [x] Support inserting global variables. 
+
+- [x] Keep multiple I/O pairs and use a different I/O pair when constructing chain calls. 
