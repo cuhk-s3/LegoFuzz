@@ -11,8 +11,6 @@ MODEL_NAME:
 MAX_TOKENS: 512
 TEMPERATURE: 0.7
 TOP_P: 0.7
-TOP_K: 50
-REPETITION_PENALTY: 1
 STOP:
   - "</s>"
   - "[INST]"
@@ -49,29 +47,29 @@ PROMPT_CODE: |
   int iwl_trans_write8(struct iwl_trans*, int, int);
   int trace_iwlwifi_dev_iowrite8(int, int, int);
   
-  __attribute__((used)) static inline void iwl_write8(struct iwl_trans *trans, u32 ofs, u8 val) {
+  __attribute__((used)) static inline void iwl_write8(struct iwl_trans *trans, u32 ofs, u8 val) {{
       trace_iwlwifi_dev_iowrite8(trans->dev, ofs, val);
       iwl_trans_write8(trans, ofs, val);
-  }
+  }}
 
   ------------------- **Incorrect Transformed** -------------------
   #include <stdlib.h>
-  struct iwl_trans {
+  struct iwl_trans {{
       int dev;
-  };
-  void iwl_trans_write8(struct iwl_trans *trans, unsigned int ofs, unsigned char val) {
+  }};
+  void iwl_trans_write8(struct iwl_trans *trans, unsigned int ofs, unsigned char val) {{
       // Placeholder for the actual write operation
-  }
-  void trace_iwlwifi_dev_iowrite8(int dev, unsigned int ofs, unsigned char val) {
+  }}
+  void trace_iwlwifi_dev_iowrite8(int dev, unsigned int ofs, unsigned char val) {{
       // Placeholder for the actual tracing operation
-  }
-  int iwl_write8(int dev, unsigned int ofs, unsigned char val) {
+  }}
+  int iwl_write8(int dev, unsigned int ofs, unsigned char val) {{
       struct iwl_trans trans;
       trans.dev = dev;
       trace_iwlwifi_dev_iowrite8(trans.dev, ofs, val);
       iwl_trans_write8(&trans, ofs, val);
       return 0;
-  }
+  }}
 
   ### Example of Correct Conversion:
   -------------------Original-------------------
@@ -85,40 +83,40 @@ PROMPT_CODE: |
 
   typedef struct TYPE_4__ TYPE_1__;
 
-  struct TYPE_4__ { scalar_t__ nalloc; scalar_t__ len; char* body; };
+  struct TYPE_4__ {{ scalar_t__ nalloc; scalar_t__ len; char* body; }};
   typedef TYPE_1__ Buffer;
 
   int realloc_body(TYPE_1__*);
 
-  void buf_write(Buffer *b, char c) {
+  void buf_write(Buffer *b, char c) {{
       if (b->nalloc == (b->len + 1))
           realloc_body(b);
       b->body[b->len++] = c;
-  }
+  }}
 
   -------------------Transformed-------------------
   #include <stdlib.h>
 
-  typedef struct {
+  typedef struct {{
       size_t nalloc;
       size_t len;
       char *body;
-  } Buffer;
+  }} Buffer;
 
-  int buf_write(int nalloc, int len, char *body, char c) {
+  int buf_write(int nalloc, int len, char *body, char c) {{
       Buffer b;
       b.nalloc = nalloc;
       b.len = len;
       b.body = body;
 
-      if (b.nalloc == (b.len + 1)) {
+      if (b.nalloc == (b.len + 1)) {{
           b.nalloc *= 2;
           b.body = realloc(b.body, b.nalloc);
-      }
+      }}
 
       b.body[b.len++] = c;
       return b.len;
-  }
+  }}
 
   ### Final Requirement:
   Provide only the correctly transformed function without any explanations or comments. Ensure the output adheres strictly to all the above instructions.

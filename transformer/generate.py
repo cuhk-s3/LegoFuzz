@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import os
 import re
@@ -6,11 +7,18 @@ import time
 import argparse
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from string import Template
+
 
 from dotenv import load_dotenv
 
 with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
+
+os.environ['all_proxy'] = ''
+os.environ['ALL_PROXY'] = ''
+os.environ["http_proxy"] = "http://127.0.0.1:7890"
+os.environ["https_proxy"] = "http://127.0.0.1:7890"
 
 MAX_THREADS = config["MAX_THREADS"]
 PROMPT_CODE = config["PROMPT_CODE"]
@@ -30,7 +38,7 @@ def process_single_item(file_path, dst, client):
 
     with open(file_path, "r", encoding="utf-8") as f:
         code_content = f.read()
-
+    
     generation_query = PROMPT_CODE.format(code_snippet=code_content)
     response = client.create_chat_completion([generation_query])
 

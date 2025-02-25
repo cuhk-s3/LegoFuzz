@@ -4,14 +4,12 @@ from abc import ABC, abstractmethod
 from openai import OpenAI
 from together import Together
 
-with open("config.yaml", "r", encoding="utf-8") as f:
+with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 MAX_TOKENS = config["MAX_TOKENS"]
 TEMPERATURE = config["TEMPERATURE"]
 TOP_P = config["TOP_P"]
-TOP_K = config["TOP_K"]
-REPETITION_PENALTY = config["REPETITION_PENALTY"]
 STOP = config["STOP"]
 MODEL_NAME = config["MODEL_NAME"]
 PROMPT_ROLE = config["PROMPT_ROLE"]
@@ -35,8 +33,6 @@ class LLMClient(ABC):
             "max_tokens": kwargs.get("max_tokens", MAX_TOKENS),
             "temperature": kwargs.get("temperature", TEMPERATURE),
             "top_p": kwargs.get("top_p", TOP_P),
-            "top_k": kwargs.get("top_k", TOP_K),
-            "repetition_penalty": kwargs.get("repetition_penalty", REPETITION_PENALTY),
             "stop": kwargs.get("stop", STOP),
         }
 
@@ -102,11 +98,11 @@ class DeepSeekClient(LLMClient):
 class LLMClientFactory:
     @staticmethod
     def create_client(client_type, api_key):
-        if client_type == "together_ai":
+        if client_type == "togetherai":
             return TogetherAIClient(api_key)   
-        elif client_type == "open_ai":
+        elif client_type == "openai":
             return OpenAIClient(api_key)    
-        elif client_type == "deepseek_ai":
+        elif client_type == "deepseek":
             return DeepSeekClient(api_key) 
         else:
             raise ValueError(f"Invalid client type: {client_type}")

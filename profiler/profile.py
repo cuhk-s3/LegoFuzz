@@ -8,14 +8,15 @@ import subprocess as sp
 from enum import Enum, auto
 import tqdm
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from databaseconstructor.functioner import FunctionDB
 from databaseconstructor.variable import VarType
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 CC1 = "gcc" # use two compilers to avoid unspecified behavior
 CC2 = "clang"
 NUM_ENV = 5 # number of env variables used for each tag, "1" means one env_val, e.g., Tag1:tag_val:env_val
-PROFILER = f"{os.path.dirname(__file__)}/profiler/build/bin/profiler --mode=expr"
+PROFILER = f"{os.path.dirname(__file__)}/build/bin/profiler --mode=expr"
 
 INVALID_TAG_VALUE = 111 # we use this value to indicate invalid tag values
 

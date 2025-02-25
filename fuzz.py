@@ -198,9 +198,9 @@ def run_one(compilers:list[str], save_wrong_dir:Path, SYNER:Synthesizer) -> Path
         print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Start synthesizer", flush=True)
     try:
         current_dir = Path.cwd() / WORK_DIR
-        syn_files = SYNER.synthesizer(dst_dir=current_dir, num_mutant=NUM_MUTANTS)
-    except:
-        print('SynthesizerError')
+        syn_files = SYNER.synthesizer(dst_dir=current_dir)
+    except Exception as e: 
+        print(f'SynthesizerError: {e}')
         return None
     src = syn_files[0]
     for syn_f in syn_files[1:]:
@@ -266,7 +266,7 @@ if __name__=='__main__':
     SAVE_DIR = Path(__file__).parent / "work/wrong"
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     compilers = parse_compilers(sys.argv[1])
-    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=80, DEBUG=DEBUG)
+    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=80, num_mutant=NUM_MUTANTS, iter=200, RAND=True, DEBUG=DEBUG)
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while 1:

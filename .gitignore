@@ -1,5 +1,9 @@
 # Mine
 compilers.in
+.env
+test/
+build/
+__pycache__/
 
 # Prerequisites
 *.d
@@ -53,8 +57,3 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
-
-build/
-__pycache__/
-
-test/

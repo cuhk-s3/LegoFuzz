@@ -6,12 +6,13 @@ from datetime import datetime
 from copy import copy
 import random
 
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
 from databaseconstructor.functioner import FunctionDB
 from databaseconstructor.variable import VarType
 from profiler.profile import MAX_CONST_CCOMP, Var
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
+def id_generator(size=10, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 def generate_int_global_var():
@@ -29,10 +30,13 @@ MAX_CHAIN_NUM = 200 # maximum number of iterations for one synthesis
 GLOBAL_VARS = {}
 
 class Synthesizer:
-    def __init__(self, func_database:str, prob:int, DEBUG: bool) -> None:
+    def __init__(self, func_database:str, prob:int, num_mutant:int, iter:int, RAND:bool=True, DEBUG: bool=False) -> None:
         assert 0 < prob <= 100
         self.prob = prob
+        self.iter = iter
+        self.num_mutant = num_mutant
         self.functionDB = FunctionDB(func_database)
+        self.RAND = RAND
         self.DEBUG = DEBUG
     
     def ignore_typedef(self, _typedef:str) -> bool:
@@ -258,7 +262,7 @@ class Synthesizer:
                     'var_value': global_arr_value
                 }
 
-    def synthesizer(self, dst_dir:Path, num_mutant:int=1):
+    def synthesizer(self, dst_dir:Path):
         """
         Synthesize a source file by replacing variables/constants with function calls.
         """
@@ -269,7 +273,7 @@ class Synthesizer:
                 seed_func = self.functionDB[seed_func_idx]
                 break
 
-        assert num_mutant >= 1
+        assert self.num_mutant >= 1
 
         succ_file_id = id_generator()
         src_filename = str((dst_dir / f'{succ_file_id}_seed.c').absolute())
@@ -290,14 +294,19 @@ class Synthesizer:
         all_syn_files = [src_filename]
         if len(seed_alive_tags) == 0:
             return all_syn_files
-        for num_i in range(num_mutant):
+        for num_i in range(self.num_mutant):
             if self.DEBUG:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant start", num_i, flush=True)
             self.src_syn = copy(self.src_orig)
             used_func = [seed_func_idx]
             tgt_func = []
             replaced_tags = {seed_func_idx: []} # a dict that contains the replaced tags of used functions(ready to be tgts)
-            repeat_time = random.randint(MAX_CHAIN_NUM // 2, MAX_CHAIN_NUM)
+            
+            if self.RAND:
+                repeat_time = random.randint(self.iter // 2, self.iter)
+            else:
+                repeat_time = self.iter
+            
             for _ in range(repeat_time):
                 tgt_func_idx = random.choice(used_func)
                 self.tags = self.functionDB[tgt_func_idx].profile
@@ -356,19 +365,24 @@ class SynthesizerError(Exception):
 if __name__=='__main__':
 
     parser = argparse.ArgumentParser(description='Synthesize a new program based on a seed program and a function database.')
+    parser.add_argument('--src', dest='SRC', required=True, help='path to the function database json file.')
     parser.add_argument('--dst', dest='DST', required=True, help='path to the destination dir.')
-    parser.add_argument('--db', dest='DB', required=True, help='path to the function database json file.')
+    parser.add_argument('--prob', dest='PROB', type=int, default=80, help='probability of replacing a constant with a function call.')
+    parser.add_argument('--num_mutant', dest='NUM_MUTANT', type=int, default=1, help='number of mutants to generate.')
+    parser.add_argument('--iter', dest='ITER', type=int, default=100, help='number of iterations for one synthesis.')
+    parser.add_argument('--no-rand', dest='RAND', action='store_false', help='randomize the number of iterations.')
+    parser.add_argument('--debug', dest='DEBUG', action='store_true', help='print debug information.')
     args = parser.parse_args()
-    if not os.path.exists(args.DB):
-        print(f"File {args.DB} does not exist!")
+    if not os.path.exists(args.SRC):
+        print(f"File {args.SRC} does not exist!")
         parser.print_help()
         exit(1)
 
     dst_dir = Path(args.DST)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    syner = Synthesizer(args.DB, prob=80, DEBUG=False)
+    syner = Synthesizer(args.SRC, args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.DEBUG)
     try:
-        all_syn_files = syner.synthesizer(dst_dir, num_mutant=1)
+        all_syn_files = syner.synthesizer(dst_dir)
     except SynthesizerError:
         print("SynthesizerError (OK).")
