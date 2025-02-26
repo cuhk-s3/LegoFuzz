@@ -271,7 +271,8 @@ class Synthesizer:
             seed_func_idx = random.randint(0, len(self.functionDB)-1)
             if self.functionDB[seed_func_idx].has_io and len(self.functionDB[seed_func_idx].profile) > 0:
                 seed_func = self.functionDB[seed_func_idx]
-                break
+                if len(seed_func.alive_tags) > 0:
+                    break
 
         assert self.num_mutant >= 1
 
@@ -290,10 +291,7 @@ class Synthesizer:
 
         # sythesis
         self.synthesize_global_variables()
-        seed_alive_tags = seed_func.alive_tags  # tags that are not replaced by constants
         all_syn_files = [src_filename]
-        if len(seed_alive_tags) == 0:
-            return all_syn_files
         for num_i in range(self.num_mutant):
             if self.DEBUG:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant start", num_i, flush=True)
