@@ -355,7 +355,7 @@ class Synthesizer:
             if self.DEBUG:
                 print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant end", num_i, flush=True)
 
-        return all_syn_files
+        return seed_func_idx, all_syn_files, used_func
 
 
 class SynthesizerError(Exception):
@@ -383,6 +383,6 @@ if __name__=='__main__':
 
     syner = Synthesizer(args.SRC, args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.DEBUG)
     try:
-        all_syn_files = syner.synthesizer(dst_dir)
+        _, all_syn_files, _ = syner.synthesizer(dst_dir)
     except SynthesizerError:
         print("SynthesizerError (OK).")

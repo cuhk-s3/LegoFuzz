@@ -198,7 +198,7 @@ def run_one(compilers:list[str], save_wrong_dir:Path, SYNER:Synthesizer) -> Path
         print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "Start synthesizer", flush=True)
     try:
         current_dir = Path.cwd() / WORK_DIR
-        syn_files = SYNER.synthesizer(dst_dir=current_dir)
+        _, syn_files, _ = SYNER.synthesizer(dst_dir=current_dir)
     except Exception as e: 
         print(f'SynthesizerError: {e}')
         return None
