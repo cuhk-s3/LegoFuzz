@@ -301,7 +301,6 @@ return v0; \
                     print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">>run_cmd with {exe_out} failed.", flush=True)
                 raise ProfilerError
             os.remove(exe_out)
-        env_re_str = ":".join([':?([-|\d]+)?']*(NUM_ENV)) #@FIXME: no need to have exact NUM_ENV env vars here, now a temp fix is shown below and thus env_re_str is useless.
 
         raw_values_1 = [[item.split(':')[0].replace('Tag', '')]+[x for x in item.split(':')[1:] if x != ''] for item in profile_out_1.split() if 'Tag' in item]
 
