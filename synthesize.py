@@ -269,7 +269,10 @@ class Synthesizer:
         # randomly select a seed function
         while True:
             seed_func_idx = random.randint(0, len(self.functionDB)-1)
-            if self.functionDB[seed_func_idx].has_io and len(self.functionDB[seed_func_idx].profile) > 0:
+            if (self.functionDB[seed_func_idx].has_io 
+                and hasattr(self.functionDB[seed_func_idx], "profile") 
+                and self.functionDB[seed_func_idx].profile is not None 
+                and len(self.functionDB[seed_func_idx].profile) > 0):
                 seed_func = self.functionDB[seed_func_idx]
                 if len(seed_func.alive_tags) > 0:
                     break
