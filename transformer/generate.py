@@ -7,7 +7,7 @@ import time
 import argparse
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from string import Template
+from pathlib import Path
 
 
 from dotenv import load_dotenv
@@ -84,7 +84,8 @@ def process_c_files(src, dst, client):
     except json.JSONDecodeError:
         log_data = []
 
-    c_files = [os.path.join(src, f) for f in os.listdir(src) if f.endswith(".c")]
+    src_path = Path(src)
+    c_files = list(src.rglob("*.c"))
 
     local_results = []
     
