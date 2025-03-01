@@ -9,16 +9,10 @@ import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-
 from dotenv import load_dotenv
 
 with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
-
-os.environ['all_proxy'] = ''
-os.environ['ALL_PROXY'] = ''
-os.environ["http_proxy"] = "http://127.0.0.1:7890"
-os.environ["https_proxy"] = "http://127.0.0.1:7890"
 
 MAX_THREADS = config["MAX_THREADS"]
 PROMPT_CODE = config["PROMPT_CODE"]
@@ -68,7 +62,7 @@ def process_single_item(file_path, dst, client):
         }
     return None
 
-def process_c_files(src, dst, client):    
+def process_c_files(src, dst, client, max_files=None):    
     if not os.path.exists(dst):
         os.makedirs(dst, exist_ok=True)
 
@@ -86,6 +80,9 @@ def process_c_files(src, dst, client):
 
     src_path = Path(src)
     c_files = list(src_path.rglob("*.c"))
+    
+    if max_files:
+        c_files = c_files[:max_files]
 
     local_results = []
     
@@ -105,9 +102,10 @@ def process_c_files(src, dst, client):
 
 def main():
     parser = argparse.ArgumentParser(description="Process a directory of C files and generate transformed C files in parallel.")
-    parser.add_argument("-s", "--src", type=str, required=True, help="Path to the source directory containing C files")
-    parser.add_argument("-d", "--dst", type=str, required=True, help="Directory to save generated C files")
-    parser.add_argument("-m", "--model", type=str, choices=["openai", "deepseek", "togetherai"], required=True, help="Which LLM model to use (openai, deepseek, togetherai)")
+    parser.add_argument("--src", type=str, required=True, help="Path to the source directory containing C files")
+    parser.add_argument("--dst", type=str, required=True, help="Directory to save generated C files")
+    parser.add_argument("--model", type=str, choices=["openai", "deepseek", "togetherai"], required=True, help="Which LLM model to use (openai, deepseek, togetherai)")
+    parser.add_argument("--max_files", type=int, default=None, help="Maximum number of C files to process")
 
     args = parser.parse_args()
 
@@ -117,7 +115,7 @@ def main():
 
     client = LLMClientFactory.create_client(args.model, api_key=api_key)
 
-    process_c_files(args.src, args.dst, client)
+    process_c_files(args.src, args.dst, client, args.max_files)
 
 if __name__ == "__main__":
     main()
