@@ -85,7 +85,7 @@ def process_c_files(src, dst, client):
         log_data = []
 
     src_path = Path(src)
-    c_files = list(src.rglob("*.c"))
+    c_files = list(src_path.rglob("*.c"))
 
     local_results = []
     
