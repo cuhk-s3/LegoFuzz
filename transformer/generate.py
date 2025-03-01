@@ -6,6 +6,7 @@ import threading
 import time
 import argparse
 import yaml
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -82,7 +83,7 @@ def process_c_files(src, dst, client, max_files=None):
     c_files = list(src_path.rglob("*.c"))
     
     if max_files:
-        c_files = c_files[:max_files]
+        c_files = random.sample(c_files, min(max_files, len(c_files)))
 
     local_results = []
     
@@ -102,9 +103,9 @@ def process_c_files(src, dst, client, max_files=None):
 
 def main():
     parser = argparse.ArgumentParser(description="Process a directory of C files and generate transformed C files in parallel.")
-    parser.add_argument("--src", type=str, required=True, help="Path to the source directory containing C files")
-    parser.add_argument("--dst", type=str, required=True, help="Directory to save generated C files")
-    parser.add_argument("--model", type=str, choices=["openai", "deepseek", "togetherai"], required=True, help="Which LLM model to use (openai, deepseek, togetherai)")
+    parser.add_argument("-s", "--src", type=str, required=True, help="Path to the source directory containing C files")
+    parser.add_argument("-d", "--dst", type=str, required=True, help="Directory to save generated C files")
+    parser.add_argument("-m", "--model", type=str, choices=["openai", "deepseek", "togetherai"], required=True, help="Which LLM model to use (openai, deepseek, togetherai)")
     parser.add_argument("--max_files", type=int, default=None, help="Maximum number of C files to process")
 
     args = parser.parse_args()
