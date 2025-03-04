@@ -87,8 +87,9 @@ def process_c_files(src, dst, client, max_files=None):
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         futures = []
         for file in c_files:
-            if max_files and len(local_results) >= max_files:
-                break
+            with count_lock:
+                if max_files and count >= max_files:
+                    break
             
             total_files_traversed += 1
             futures.append(executor.submit(process_single_item, file, dst, client))
@@ -97,8 +98,11 @@ def process_c_files(src, dst, client, max_files=None):
             result = future.result()
             if result:
                 local_results.append(result)
-                if max_files and len(local_results) >= max_files:
-                    break
+                
+                with count_lock:
+                    count += 1
+                    if max_files and count >= max_files:
+                        break
     
     with log_lock:
         log_data.extend(local_results)
