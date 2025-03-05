@@ -64,6 +64,11 @@ class Synthesizer:
                     miscs = miscs + misc + "\n"
 
             function_body = self.functionDB[func_id].function_body
+            if random.randint(0, 100) > self.prob:
+                return_type = VarType.to_str(self.functionDB[func_id].return_type)
+                function_name = self.functionDB[func_id].call_name
+                inline_sig = "inline __attribute__((always_inline))" + " " + return_type + " " + function_name
+                function_body = function_body.replace(return_type + " " + function_name, inline_sig, 1)
             function_body = "\n" + miscs + function_body + "\n"
             self.src_syn = function_body + self.src_syn
         
