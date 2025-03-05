@@ -30,13 +30,14 @@ MAX_CHAIN_NUM = 200 # maximum number of iterations for one synthesis
 GLOBAL_VARS = {}
 
 class Synthesizer:
-    def __init__(self, func_database:str, prob:int, num_mutant:int, iter:int, RAND:bool=True, DEBUG: bool=False) -> None:
+    def __init__(self, func_database:str, prob:int, num_mutant:int, iter:int, RAND:bool=True, INLINE:bool=True, DEBUG: bool=False) -> None:
         assert 0 < prob <= 100
         self.prob = prob
         self.iter = iter
         self.num_mutant = num_mutant
         self.functionDB = FunctionDB(func_database)
         self.RAND = RAND
+        self.INLINE = INLINE
         self.DEBUG = DEBUG
     
     def ignore_typedef(self, _typedef:str) -> bool:
@@ -64,7 +65,7 @@ class Synthesizer:
                     miscs = miscs + misc + "\n"
 
             function_body = self.functionDB[func_id].function_body
-            if random.randint(0, 100) > self.prob:
+            if self.INLINE and random.randint(0, 100) > self.prob:
                 return_type = VarType.to_str(self.functionDB[func_id].return_type)
                 function_name = self.functionDB[func_id].call_name
                 inline_sig = "inline __attribute__((always_inline))" + " " + return_type + " " + function_name
@@ -377,6 +378,7 @@ if __name__=='__main__':
     parser.add_argument('--num_mutant', dest='NUM_MUTANT', type=int, default=1, help='number of mutants to generate.')
     parser.add_argument('--iter', dest='ITER', type=int, default=100, help='number of iterations for one synthesis.')
     parser.add_argument('--no-rand', dest='RAND', action='store_false', help='randomize the number of iterations.')
+    parser.add_argument('--no-inline', dest='INLINE', action='store_false', help='do not inline the function call.')
     parser.add_argument('--debug', dest='DEBUG', action='store_true', help='print debug information.')
     args = parser.parse_args()
     if not os.path.exists(args.SRC):
@@ -387,7 +389,7 @@ if __name__=='__main__':
     dst_dir = Path(args.DST)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    syner = Synthesizer(args.SRC, args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.DEBUG)
+    syner = Synthesizer(args.SRC, args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.INLINE, args.DEBUG)
     try:
         _, all_syn_files, _ = syner.synthesizer(dst_dir)
     except SynthesizerError:
