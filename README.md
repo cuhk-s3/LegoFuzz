@@ -1,6 +1,6 @@
 # LegoFuzz
 
-**LegoFuzz** is a LLMs-based fuzzing framework. It currently supports testing C compilers, such as GCC and LLVM. 
+**LegoFuzz** is an LLM-based fuzzing framework. It currently supports testing C compilers, such as GCC and LLVM. 
 
 > The core idea behind LegoFuzz is to separate the whole testing process into two phases: offline and online. The offline phase queries LLMs to collect valid code snippets, which enables us to control the quality of code as well as the cost for LLMs querying. In contrast, the online phase eliminates the dependency on LLMs by **reusing** these pre-generated code snippets. Through our proposed *iterative program synthesis*, the online phase constructs increasingly complex yet valid programs for executing testing. 
 
