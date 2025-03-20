@@ -66,7 +66,6 @@ class TogetherAIClient(LLMClient):
 class OpenAIClient(LLMClient):
     def __init__(self, api_key):
         self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
         )
         

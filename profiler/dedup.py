@@ -99,6 +99,6 @@ def update_function_names(json_file):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python script.py <json_file>")
+        print("Usage: python dedup.py <json_file>")
     else:
         update_function_names(sys.argv[1])

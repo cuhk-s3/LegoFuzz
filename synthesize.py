@@ -371,10 +371,10 @@ class SynthesizerError(Exception):
 
 if __name__=='__main__':
 
-    parser = argparse.ArgumentParser(description='Synthesize a new program based on a seed program and a function database.')
+    parser = argparse.ArgumentParser(description='Synthesize a new program based on with a function database.')
     parser.add_argument('--src', dest='SRC', required=True, help='path to the function database json file.')
     parser.add_argument('--dst', dest='DST', required=True, help='path to the destination dir.')
-    parser.add_argument('--prob', dest='PROB', type=int, default=80, help='probability of replacing a constant with a function call.')
+    parser.add_argument('--prob', dest='PROB', type=int, default=80, help='probability of replacing an expression')
     parser.add_argument('--num_mutant', dest='NUM_MUTANT', type=int, default=1, help='number of mutants to generate.')
     parser.add_argument('--iter', dest='ITER', type=int, default=100, help='number of iterations for one synthesis.')
     parser.add_argument('--no-rand', dest='RAND', action='store_false', help='randomize the number of iterations.')
