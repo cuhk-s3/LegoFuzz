@@ -93,7 +93,7 @@ Parameters explanation:
 
 **Step 2: Code Database Construction**
 
-> Before proceeding, ensure you have followed the instructions in `databaseconstructor/README.md` and `profiler/README.md` to build the function extractor and profiler.
+> Before proceeding, ensure you have followed the instructions in `databaseconstructor/functionextractor/README.md` and `profiler/README.md` to build the function extractor and profiler.
 
 Firstly, extract functions from the LLMs-generated C files:
 
