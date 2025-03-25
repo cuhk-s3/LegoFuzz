@@ -40,12 +40,12 @@ This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal).
 **Step 2: Synthesize a program**
 
 ```shell
-./synthesize.py --src functions.json --dst ./tmp --iter 10
+$ ./synthesize.py --src functions.json --dst ./tmp --iter 10
 ```
 
 LegoFuzz will synthesize a program with 10 iterations. The synthesized program is stored in the `dst` directory, which is "./tmp" in this case. 
 
-> Note: Due to GitHub's 2GB file size limitation, we are unable to provide the complete database containing 553,246 functions. Instead, `functions.json` currently includes 250，000 functions of the dataset. You can follow the full run instructions to generate the database yourself. 
+> Note: Due to GitHub's 2GB file size limitation, we are unable to provide the complete database containing 553,246 functions. Instead, `functions.json` currently includes 250,000 functions of the dataset. You can follow the full run instructions to generate the database yourself. 
 >
 > We are also preparing a formal artifact that will provide the complete dataset. Please stay tuned for the artifact release! 🚀
 
@@ -77,7 +77,7 @@ If you wish to use a different platform, you can extend support in `transformer/
 Once your API key is set, you can generate aligned C code using the following command:
 
 ```shell
-./generate.py --src <DIR_SRC> --dst <DIR_DST> openai 
+$ ./generate.py --src <DIR_SRC> --dst <DIR_DST> openai 
 ```
 
 Parameters explanation:
@@ -125,7 +125,7 @@ After these steps, you will have a fully constructed function database.
 Once the function database is ready (`profiler/functions_profiled.json`), you can synthesize programs using:
 
 ```shell
-./synthesize.py --src profiler/functions_profiled.json --dst ./tmp --prob 80 --num_mutant 10 --iter 100
+$ ./synthesize.py --src profiler/functions_profiled.json --dst ./tmp --prob 80 --num_mutant 10 --iter 100
 ```
 
 This command generates 10 mutants in the `tmp` directory, starting from an initial seed function.
@@ -163,7 +163,7 @@ gcc -O1
 Then, start to fuzz:
 
 ```shell
-./fuzz.py compilers.in
+$ ./fuzz.py compilers.in
 ```
 
 A `work` directory will be created, and any detected bugs will be stored in `work/wrong`.
