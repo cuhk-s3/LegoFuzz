@@ -4,6 +4,7 @@ compilers.in
 test/
 build/
 __pycache__/
+.venv
 
 # Prerequisites
 *.d

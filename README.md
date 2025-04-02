@@ -39,6 +39,8 @@ This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal).
 
 **Step 2: Synthesize a program**
 
+> Please run `git lfs install && git lfs pull` first to download `functions.json`.
+
 ```shell
 $ ./synthesize.py --src functions.json --dst ./tmp --iter 10
 ```
