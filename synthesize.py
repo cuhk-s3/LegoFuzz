@@ -378,7 +378,7 @@ if __name__=='__main__':
     parser.add_argument('--num_mutant', dest='NUM_MUTANT', type=int, default=1, help='number of mutants to generate.')
     parser.add_argument('--iter', dest='ITER', type=int, default=100, help='number of iterations for one synthesis.')
     parser.add_argument('--no-rand', dest='RAND', action='store_false', help='randomize the number of iterations.')
-    parser.add_argument('--no-inline', dest='INLINE', action='store_false', help='do not inline the function call.')
+    parser.add_argument('--inline', dest='INLINE', action='store_true', help='inline the function call.')
     parser.add_argument('--debug', dest='DEBUG', action='store_true', help='print debug information.')
     args = parser.parse_args()
     if not os.path.exists(args.SRC):

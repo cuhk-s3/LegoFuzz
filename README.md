@@ -139,7 +139,7 @@ Parameters explanation:
 --num_mutant NUM_MUTANT  number of mutants to generate (default=1).
 --iter ITER              number of iterations for one synthesis (default=100).
 --no-rand                randomize the number of iterations.
---no-inline              do not inline the function call.
+--inline                 inline the function call.
 --debug                  print debug information.
 ```
 
