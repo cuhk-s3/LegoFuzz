@@ -70,8 +70,10 @@ void ruleactioncallback::RuleActionCallback::run(
         llvm::errs() << "An error has occured.\n";
         return;
     }
-    Expected<SmallVector<transformer::Edit, 1>> Edits =
-        transformer::detail::findSelectedCase(Result, Rule).Edits(Result);
+    // Expected<SmallVector<transformer::Edit, 1>> Edits =
+        // transformer::detail::findSelectedCase(Result, Rule).Edits(Result);
+    size_t I = transformer::detail::findSelectedCase(Result, Rule);
+    Expected<SmallVector<transformer::Edit, 1>> Edits = Rule.Cases[I].Edits(Result);
     if (!Edits) {
         llvm::errs() << "Rewrite failed: " << llvm::toString(Edits.takeError())
                      << "\n";

@@ -45,7 +45,7 @@ class AddGlobalMacro : public MatchComputation<std::string> {
     }
 };
 
-struct clang::transformer::RewriteRule AddGlobalMacroRule() {
+clang::transformer::RewriteRule AddGlobalMacroRule() {
     return makeRule(functionDecl(
         isExpansionInMainFile(),
         isMain()

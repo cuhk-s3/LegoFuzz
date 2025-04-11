@@ -183,7 +183,7 @@ auto statementMatcher = expr(
 );
 
 
-struct clang::transformer::RewriteRule TagExpressionRule() {
+clang::transformer::RewriteRule TagExpressionRule() {
     return makeRule(matcher, {
         insertBefore(node("expr"), std::make_unique<TagExpressionAction>()),
         insertAfter(node("expr"), cat(")")),
@@ -192,7 +192,7 @@ struct clang::transformer::RewriteRule TagExpressionRule() {
     });
 }
 
-struct clang::transformer::RewriteRule TagStatementRule() {
+ clang::transformer::RewriteRule TagStatementRule() {
     return makeRule(statementMatcher, {
         insertBefore(node("stmt"), std::make_unique<TagExpressionAction>()),
         insertAfter(node("stmt"), cat(")"))

@@ -6,7 +6,7 @@ namespace tagexpression {
 
 extern std::map<int, std::string> Tags; // <id, type>
 
-struct clang::transformer::RewriteRule TagExpressionRule();
-struct clang::transformer::RewriteRule TagStatementRule();
+clang::transformer::RewriteRule TagExpressionRule();
+clang::transformer::RewriteRule TagStatementRule();
 
 }

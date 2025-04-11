@@ -4,6 +4,6 @@
 
 namespace globalmacro {
 
-struct clang::transformer::RewriteRule AddGlobalMacroRule(void);
+clang::transformer::RewriteRule AddGlobalMacroRule(void);
 
 }
