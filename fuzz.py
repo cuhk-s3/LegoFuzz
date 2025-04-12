@@ -145,7 +145,7 @@ def compile_and_run(compiler, src):
     tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
     tmp_f.close()
     exe = tmp_f.name
-    cmd = f"{compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
+    cmd = f"bash -c 'ulimit -v 1024000; {compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
     ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
     if ret == 124: # another compile chance when timeout
         time.sleep(1)
