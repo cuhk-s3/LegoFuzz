@@ -6,6 +6,7 @@ __pycache__/
 .venv
 fuzz/
 bugs/
+compilers.in
 
 # Prerequisites
 *.d

@@ -43,8 +43,6 @@ SAN_CCOMP = this_CComp.get_system_ccomp() # CompCert only
 """Global vars"""
 
 WORK_DIR = "work"
-if not os.path.exists(WORK_DIR):
-    os.makedirs(WORK_DIR)
 
 class CompCode(Enum):
     """Compile status
