@@ -1,11 +1,11 @@
 # Mine
-compilers.in
 .env
 test/
 build/
 __pycache__/
 .venv
-work*
+fuzz/
+bugs/
 
 # Prerequisites
 *.d

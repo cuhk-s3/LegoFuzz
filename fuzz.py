@@ -267,15 +267,15 @@ def parse_compilers(compiler_config_file):
 
 
 def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
-    save_dir = Path("work/wrong")
+    save_dir = Path("bugs")
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    work_dir = Path(f"work{worker_id}")
+    work_dir = Path(f"fuzz/work{worker_id}")
     work_dir.mkdir(parents=True, exist_ok=True)
     os.chdir(work_dir.absolute().as_posix())
     Path("work").mkdir(parents=True, exist_ok=True)
 
-    sys.stdout = open("output.txt", "w")
+    sys.stdout = open("log.txt", "w")
     sys.stderr = sys.stdout
     
     SYNER = Synthesizer(
@@ -298,7 +298,7 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
 if __name__=='__main__':
 
     parser = argparse.ArgumentParser(description='Let\'s LegoFuzz!')
-    parser.add_argument('--num', type=int, default=1, help='number of CPUs to run in parallel')
+    parser.add_argument('--cpu', type=int, default=1, help='number of CPUs to run in parallel')
     parser.add_argument('--config', type=str, required=True, help='Path to compiler config file')
     args = parser.parse_args()
 
@@ -306,7 +306,7 @@ if __name__=='__main__':
     func_db = FunctionDB(FUNCTION_DB_FILE)  # Loaded once and forked (copy-on-write)
 
     processes = []
-    for i in range(args.num):
+    for i in range(args.cpu):
         p = mp.Process(target=fuzz_worker, args=(i, compilers, func_db))
         p.start()
         processes.append(p)
