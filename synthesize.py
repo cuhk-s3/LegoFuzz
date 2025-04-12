@@ -30,12 +30,12 @@ MAX_CHAIN_NUM = 200 # maximum number of iterations for one synthesis
 GLOBAL_VARS = {}
 
 class Synthesizer:
-    def __init__(self, func_database:str, prob:int, num_mutant:int, iter:int, RAND:bool=True, INLINE:bool=True, DEBUG: bool=False) -> None:
+    def __init__(self, func_database:FunctionDB, prob:int, num_mutant:int, iter:int, RAND:bool=True, INLINE:bool=True, DEBUG: bool=False) -> None:
         assert 0 < prob <= 100
         self.prob = prob
         self.iter = iter
         self.num_mutant = num_mutant
-        self.functionDB = FunctionDB(func_database)
+        self.functionDB = func_database
         self.RAND = RAND
         self.INLINE = INLINE
         self.DEBUG = DEBUG
@@ -389,7 +389,7 @@ if __name__=='__main__':
     dst_dir = Path(args.DST)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    syner = Synthesizer(args.SRC, args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.INLINE, args.DEBUG)
+    syner = Synthesizer(FunctionDB(args.SRC), args.PROB, args.NUM_MUTANT, args.ITER, args.RAND, args.INLINE, args.DEBUG)
     try:
         _, all_syn_files, _ = syner.synthesizer(dst_dir)
     except SynthesizerError:

@@ -5,6 +5,7 @@ test/
 build/
 __pycache__/
 .venv
+work*
 
 # Prerequisites
 *.d
