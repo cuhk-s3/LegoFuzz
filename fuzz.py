@@ -298,8 +298,18 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
 if __name__=='__main__':
 
     parser = argparse.ArgumentParser(description='Let\'s LegoFuzz!')
-    parser.add_argument('--cpu', type=int, default=1, help='number of CPUs to run in parallel')
-    parser.add_argument('--config', type=str, required=True, help='Path to compiler config file')
+    parser.add_argument(
+        '--cpu',
+        type=int,
+        default=mp.cpu_count(),
+        help='Number of CPUs to run in parallel (default: all available cores)'
+    )
+    parser.add_argument(
+        '--config',
+        type=str,
+        default='compilers.in',
+        help='Path to compiler config file (default: ./compilers.in)'
+    )
     args = parser.parse_args()
 
     compilers = parse_compilers(args.config)
