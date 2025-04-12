@@ -271,11 +271,20 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
     work_dir = Path(f"fuzz/work{worker_id}")
     work_dir.mkdir(parents=True, exist_ok=True)
     os.chdir(work_dir.absolute().as_posix())
-    Path("work").mkdir(parents=True, exist_ok=True)
+
+    inner_work_dir = Path("work")
+    inner_work_dir.mkdir(parents=True, exist_ok=True)
+    for item in inner_work_dir.iterdir():
+        if item.is_file():
+            item.unlink()
+        elif item.is_dir():
+            shutil.rmtree(item)
 
     sys.stdout = open("log.txt", "w")
     sys.stderr = sys.stdout
     
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] LegoFuzz starts", flush=True)
+
     SYNER = Synthesizer(
         func_database=func_db,
         prob=80,
