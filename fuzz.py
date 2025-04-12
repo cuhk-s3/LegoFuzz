@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import argparse
+import multiprocessing as mp
 import re
 import sys
 import os, shutil, time, tempfile, signal, random, string
@@ -15,6 +17,7 @@ from diopter.compiler import (
 from diopter.sanitizer import Sanitizer
 from diopter.utils import TempDirEnv
 import subprocess as sp
+from databaseconstructor.functioner import FunctionDB
 from synthesize import Synthesizer
 from utils.compcert import CComp as this_CComp
 from pathlib import Path
@@ -40,8 +43,6 @@ SAN_CCOMP = this_CComp.get_system_ccomp() # CompCert only
 """Global vars"""
 
 WORK_DIR = "work"
-if not os.path.exists(WORK_DIR):
-    os.makedirs(WORK_DIR)
 
 class CompCode(Enum):
     """Compile status
@@ -239,6 +240,7 @@ def run_one(compilers:list[str], save_wrong_dir:Path, SYNER:Synthesizer) -> Path
         print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "End synthesizer", flush=True)
     for syn_f in syn_files:
         os.remove(syn_f)
+    print("--------------------------")
     return None
 
 def parse_compilers(compiler_config_file):
@@ -262,15 +264,69 @@ def parse_compilers(compiler_config_file):
     return compilers
 
 
-if __name__=='__main__':
-    SAVE_DIR = Path(__file__).parent / "work/wrong"
-    SAVE_DIR.mkdir(parents=True, exist_ok=True)
-    compilers = parse_compilers(sys.argv[1])
-    SYNER = Synthesizer(func_database=FUNCTION_DB_FILE, prob=80, num_mutant=NUM_MUTANTS, iter=200, RAND=True, INLINE=False, DEBUG=DEBUG)
+def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
+    save_dir = Path("bugs")
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    work_dir = Path(f"fuzz/work{worker_id}")
+    work_dir.mkdir(parents=True, exist_ok=True)
+    os.chdir(work_dir.absolute().as_posix())
+
+    inner_work_dir = Path("work")
+    inner_work_dir.mkdir(parents=True, exist_ok=True)
+    for item in inner_work_dir.iterdir():
+        if item.is_file():
+            item.unlink()
+        elif item.is_dir():
+            shutil.rmtree(item)
+
+    sys.stdout = open("log.txt", "w")
+    sys.stderr = sys.stdout
+    
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] LegoFuzz starts", flush=True)
+
+    SYNER = Synthesizer(
+        func_database=func_db,
+        prob=80,
+        num_mutant=NUM_MUTANTS,
+        iter=200,
+        RAND=True,
+        INLINE=False,
+        DEBUG=DEBUG
+    )
+
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
-        while 1:
-            run_one(compilers, SAVE_DIR, SYNER)
-            print("---")
+        while True:
+            run_one(compilers, save_dir, SYNER)
             for p in tmp_dir.iterdir():
                 p.unlink()
+
+if __name__=='__main__':
+
+    parser = argparse.ArgumentParser(description='Let\'s LegoFuzz!')
+    parser.add_argument(
+        '--cpu',
+        type=int,
+        default=mp.cpu_count(),
+        help='Number of CPUs to run in parallel (default: all available cores)'
+    )
+    parser.add_argument(
+        '--config',
+        type=str,
+        default='compilers.in',
+        help='Path to compiler config file (default: ./compilers.in)'
+    )
+    args = parser.parse_args()
+
+    compilers = parse_compilers(args.config)
+    func_db = FunctionDB(FUNCTION_DB_FILE)  # Loaded once and forked (copy-on-write)
+
+    processes = []
+    for i in range(args.cpu):
+        p = mp.Process(target=fuzz_worker, args=(i, compilers, func_db))
+        p.start()
+        processes.append(p)
+
+    for p in processes:
+        p.join()

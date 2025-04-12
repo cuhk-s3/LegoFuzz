@@ -165,7 +165,14 @@ gcc -O1
 Then, start to fuzz:
 
 ```shell
-$ ./fuzz.py compilers.in
+$ ./fuzz.py --cpu 4 --config compilers.in
 ```
 
-A `work` directory will be created, and any detected bugs will be stored in `work/wrong`.
+This will launch the fuzzing process using 4 CPU cores. A `fuzz` directory will be created and any detected bugs will be stored in `bugs` directory. 
+
+Parameters explanation:
+
+```shell
+--cpu CPU        Number of CPUs to run in parallel (default: all available cores)
+--config CONFIG  Path to compiler config file (default: ./compilers.in)
+```
