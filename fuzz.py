@@ -145,7 +145,7 @@ def compile_and_run(compiler, src):
     tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
     tmp_f.close()
     exe = tmp_f.name
-    cmd = f"bash -c 'ulimit -v 1024000; {compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
+    cmd = f"{compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
     ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
     if ret == 124: # another compile chance when timeout
         time.sleep(1)
@@ -274,6 +274,11 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
 
     inner_work_dir = Path("work")
     inner_work_dir.mkdir(parents=True, exist_ok=True)
+    for item in inner_work_dir.iterdir():
+         if item.is_file():
+             item.unlink()
+         elif item.is_dir():
+             shutil.rmtree(item)
 
     sys.stdout = open("log.txt", "w")
     sys.stderr = sys.stdout
@@ -293,7 +298,7 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while True:
-            run_one(compilers, save_dir.absolute().as_posix(), SYNER)
+            run_one(compilers, save_dir.absolute(), SYNER)
             for p in tmp_dir.iterdir():
                 p.unlink()
 
