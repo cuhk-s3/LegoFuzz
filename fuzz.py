@@ -274,11 +274,6 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
 
     inner_work_dir = Path("work")
     inner_work_dir.mkdir(parents=True, exist_ok=True)
-    for item in inner_work_dir.iterdir():
-        if item.is_file():
-            item.unlink()
-        elif item.is_dir():
-            shutil.rmtree(item)
 
     sys.stdout = open("log.txt", "w")
     sys.stderr = sys.stdout
@@ -289,7 +284,7 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
         func_database=func_db,
         prob=80,
         num_mutant=NUM_MUTANTS,
-        iter=200,
+        iter=100,
         RAND=True,
         INLINE=False,
         DEBUG=DEBUG
@@ -298,7 +293,7 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while True:
-            run_one(compilers, save_dir, SYNER)
+            run_one(compilers, save_dir.absolute().as_posix(), SYNER)
             for p in tmp_dir.iterdir():
                 p.unlink()
 
