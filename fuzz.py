@@ -265,7 +265,7 @@ def parse_compilers(compiler_config_file):
 
 
 def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
-    save_dir = Path("bugs")
+    save_dir = Path("bugs").resolve()
     save_dir.mkdir(parents=True, exist_ok=True)
 
     work_dir = Path(f"fuzz/work{worker_id}")
@@ -298,7 +298,7 @@ def fuzz_worker(worker_id: int, compilers: list[str], func_db: FunctionDB):
     with TempDirEnv() as tmp_dir:
         os.environ['TMPDIR'] = tmp_dir.absolute().as_posix()
         while True:
-            run_one(compilers, save_dir.absolute(), SYNER)
+            run_one(compilers, save_dir, SYNER)
             for p in tmp_dir.iterdir():
                 p.unlink()
 
