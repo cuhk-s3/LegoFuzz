@@ -31,7 +31,7 @@ This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal).
 - **Csmith** (Please install it following [Csmith](https://github.com/csmith-project/csmith))
 - **CSMITH_HOME**: After installing Csmith, please set the environment variable `CSMITH_HOME` to the installation path, with which we can locate `$CSMITH_HOME/include/csmith.h`.
 - **CompCert** (Please install it following [CompCert](https://compcert.org/man/manual002.html#install))
-- **clang** >= 14, **libclang-dev**
+- **clang** >= 18, **libclang-dev**
 - **diopter** == 0.0.24 (`pip install diopter==0.0.24`)
 - **termcolor** (`pip install termcolor`)
 - **openai** (`pip install openai`)
