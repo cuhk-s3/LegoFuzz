@@ -1,12 +1,17 @@
-# LegoFuzz
+# LegoFuzz  (🧱⮕🏗️⮕🏠)
 
+**📢 News:**<br>
+LegoFuzz is accepted to [ACM OOPSLA 2025](https://2025.splashcon.org/track/OOPSLA). Check out preprint here 👉 [Interleaving Large Language Models for Compiler Testing](https://arxiv.org/pdf/2508.18955) 👈
+
+---
+**📙 About:**<br>
 **LegoFuzz** is an LLM-based fuzzing framework. It currently supports testing C compilers, such as GCC and LLVM. 
 
 > The core idea behind LegoFuzz is to separate the whole testing process into two phases: offline and online. The offline phase queries LLMs to collect valid code snippets, which enables us to control the quality of code as well as the cost for LLMs querying. In contrast, the online phase eliminates the dependency on LLMs by **reusing** these pre-generated code snippets. Through our proposed *iterative program synthesis*, the online phase constructs increasingly complex yet valid programs for executing testing. 
 
 This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal). 
 
-## Structure of the project
+## 📂 Structure of the project
 
 ```
 ├── synthesize.py         # For iterative program synthesis
@@ -23,7 +28,7 @@ This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal).
 └── utils                 # Development utilities
 ```
 
-## QuickStart
+## 🔥 QuickStart
 
 **Step 1: Environment setup**
 
@@ -51,7 +56,7 @@ LegoFuzz will synthesize a program with 10 iterations. The synthesized program i
 >
 > We are also preparing a formal artifact that will provide the complete dataset. Please stay tuned for the artifact release! 🚀
 
-## Full run with LegoFuzz
+## 🏃 Full run with LegoFuzz
 
 > Before running, please setup the enviroment following Step 1 in Quickstart.
 
