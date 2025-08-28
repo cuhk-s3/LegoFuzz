@@ -61,7 +61,7 @@ public:
 };
 
 
-struct clang::transformer::RewriteRule processCallRule() {
+clang::transformer::RewriteRule processCallRule() {
     auto callMatcher = functionDecl(
         isExpansionInMainFile(),
         isDefinition(),
@@ -78,7 +78,7 @@ struct clang::transformer::RewriteRule processCallRule() {
 }
 
 /* Remove extern function declarations */
-struct clang::transformer::RewriteRule processExternRule() {
+clang::transformer::RewriteRule processExternRule() {
     auto functionDeclMatcher = functionDecl(
         isExpansionInMainFile(),
         isDefinition(),
