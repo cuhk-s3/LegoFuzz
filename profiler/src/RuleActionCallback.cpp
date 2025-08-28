@@ -25,9 +25,8 @@ std::string GetFilenameFromRange(const CharSourceRange &R,
                                 const SourceManager &SM) {
     const std::pair<FileID, unsigned> DecomposedLocation =
         SM.getDecomposedLoc(SM.getSpellingLoc(R.getBegin()));
-    const FileEntry *Entry = SM.getFileEntryForID(DecomposedLocation.first);
-return std::string(Entry ? Entry->getName() : "");
-
+    auto Entry = SM.getFileEntryRefForID(DecomposedLocation.first);
+    return Entry ? std::string(Entry->getName()) : "";
 }
 
 Expected<DynTypedNode> getNode(const ast_matchers::BoundNodes &Nodes,
