@@ -5,7 +5,7 @@
 namespace process {
 
 /* Rename global variable declaration */
-struct clang::transformer::RewriteRule processRenameGlobalRule() {
+clang::transformer::RewriteRule processRenameGlobalRule() {
     auto globalDeclMatcher = varDecl(
         isExpansionInMainFile(),
         hasGlobalStorage(),
@@ -25,7 +25,7 @@ struct clang::transformer::RewriteRule processRenameGlobalRule() {
 }
 
 /* Rename global variable reference */
-struct clang::transformer::RewriteRule processRenameGlobalRefRule() {
+clang::transformer::RewriteRule processRenameGlobalRefRule() {
     auto globalDefRefMatcher = declRefExpr(
         isExpansionInMainFile(),
         to(varDecl(

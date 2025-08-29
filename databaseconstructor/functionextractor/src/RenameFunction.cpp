@@ -29,7 +29,7 @@ public:
 };
 
 
-struct clang::transformer::RewriteRule processRenameFunctionRule() {
+clang::transformer::RewriteRule processRenameFunctionRule() {
     auto functionMatcher = functionDecl(
     isExpansionInMainFile(),
     isDefinition()

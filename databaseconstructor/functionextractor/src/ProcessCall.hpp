@@ -5,7 +5,7 @@
 
 namespace process {
 
-    struct clang::transformer::RewriteRule processCallRule();
-    struct clang::transformer::RewriteRule processExternRule();
+    clang::transformer::RewriteRule processCallRule();
+    clang::transformer::RewriteRule processExternRule();
 
 } // namespace process
