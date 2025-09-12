@@ -41,10 +41,12 @@ This project is partly based on [Creal](https://github.com/UniCodeSphere/Creal).
 - **termcolor** (`pip install termcolor`)
 - **openai** (`pip install openai`)
 - **together** (`pip install together`)
+- **Build the profiler** (`cd profiler` and then check the documentation there!)
 
 **Step 2: Synthesize a program**
+> ⚠️ Please ensure you have built the profiler (`cd profiler` and then check the documentation there!)
 
-> Please run `git lfs install && git lfs pull` first to download `functions.json`.
+> ⚠️ Please run `git lfs install && git lfs pull` first to download `functions.json`.
 
 ```shell
 $ ./synthesize.py --src functions.json --dst ./tmp --iter 10
