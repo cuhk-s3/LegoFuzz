@@ -186,7 +186,7 @@ print_success "Function profiling completed"
 
 # Deduplication
 print_status "Running deduplication..."
-dedup.py "$OUTPUT_DATABASE"
+./dedup.py "$OUTPUT_DATABASE"
 
 if [[ $? -ne 0 ]]; then
     print_warning "Deduplication failed, but continuing..."
