@@ -8,9 +8,9 @@ import random
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from databaseconstructor.functioner import FunctionDB
-from databaseconstructor.variable import VarType
-from profiler.profile import MAX_CONST_CCOMP, Var
+from dbconstructor.iogenerator.functioner import FunctionDB
+from dbconstructor.iogenerator.variable import VarType
+from dbconstructor.profiler.profile import MAX_CONST_CCOMP, Var
 
 def id_generator(size=10, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
