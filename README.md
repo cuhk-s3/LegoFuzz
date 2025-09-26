@@ -89,14 +89,9 @@ This step analyzes the generated functions, extracts their properties, and creat
 
 Now comes the exciting part - **differential testing**! LegoFuzz will build programs using your Lego blocks and test them across multiple compilers to find inconsistencies.
 
-Configure your target compilers in `compilers.in`:
-```shell
-# Edit compilers.in to specify which compilers to test
-gcc -O2
-clang -O2  
-gcc -O3
-clang -O3
-```
+You can customize which compilers to test by editing the `compilers.in` file - add your favorite compilers with different optimization levels to maximize bug discovery potential.
+
+Ready to start hunting for bugs? Launch the fuzzing campaign:
 
 ```shell
 # Launch the fuzzing campaign
