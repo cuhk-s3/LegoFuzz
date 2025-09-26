@@ -26,7 +26,7 @@ This project is partly based on [Creal](https://github.com/cuhk-s3/Creal).
 
 > [!Note]
 > This QuickStart focuses on experiencing the **online phase** of LegoFuzz - the iterative program synthesis. 
-> For the complete workflow including LLM-based code generation (offline phase), see the "Full run with LegoFuzz" section below.
+> For the complete workflow including LLM-based code generation (offline phase), see the "🏗️ Complete LegoFuzz Workflow: From Blocks to Bugs" section below.
 
 **Step 1: Environment setup**
 
