@@ -361,8 +361,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--src",
         type=str,
-        default="functions.json",
-        help="Path to function database file (default: functions.json)",
+        default="functions.jsonl",
+        help="Path to function database file (default: functions.jsonl)",
     )
     parser.add_argument(
         "--cpu",

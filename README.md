@@ -42,7 +42,7 @@ Now let's start assembling! We've prepared a function database (like a box of Le
 
 ```shell
 # Start building! Combine functions like Lego blocks
-$ ./synthesize.py --src functions.json --dst ./out --iter 10
+$ ./synthesize.py --src functions.jsonl --dst ./out --iter 10
 ```
 
 ## 🏗️ Complete LegoFuzz Workflow: From Blocks to Bugs
