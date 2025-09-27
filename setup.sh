@@ -77,8 +77,7 @@ install_system_dependencies() {
         autoconf \
         automake \
         libtool \
-        m4 \
-        expect > /dev/null 2>&1
+        m4 > /dev/null 2>&1
 
         
     # Install Python 3.10+ if needed
