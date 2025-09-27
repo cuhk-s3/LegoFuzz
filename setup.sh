@@ -71,7 +71,13 @@ install_system_dependencies() {
         ninja-build \
         git \
         wget \
-        curl > /dev/null 2>&1
+        curl \
+        lsb-release \
+        autotools-dev \
+        autoconf \
+        automake \
+        libtool \
+        m4 > /dev/null 2>&1
 
         
     # Install Python 3.10+ if needed
@@ -81,6 +87,10 @@ install_system_dependencies() {
         # Set python3 to point to python3.10
         sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 > /dev/null 2>&1
     fi
+    
+    # Ensure python3-venv is installed for virtual environment support
+    print_status "Ensuring python3-venv is installed..."
+    sudo apt-get install -y -qq python3-venv > /dev/null 2>&1
     
     print_success "System dependencies installed"
 }
@@ -128,20 +138,40 @@ install_clang() {
     fi
 }
 
-install_python_packages() {
-    print_status "Installing Python packages..."
+setup_python_environment() {
+    print_status "Setting up Python virtual environment..."
+    
+    local venv_dir=".venv"
+    
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "$venv_dir" ]; then
+        print_status "Creating virtual environment..."
+        python3 -m venv "$venv_dir"
+    else
+        print_success "Virtual environment already exists"
+    fi
+    
+    # Activate virtual environment
+    print_status "Activating virtual environment..."
+    source "$venv_dir/bin/activate"
     
     # Upgrade pip quietly
-    print_status "Upgrading pip..."
-    python3 -m pip install --upgrade pip --quiet
+    print_status "Upgrading pip in virtual environment..."
+    pip install --upgrade pip --quiet
     
     # Install required packages
     print_status "Installing diopter..."
-    python3 -m pip install diopter==0.0.24 --quiet
-    print_status "Installing termcolor, openai, together..."
-    python3 -m pip install termcolor openai together --quiet
+    pip install diopter==0.0.24 --quiet
+    print_status "Installing tqdm..."
+    pip install tqdm --quiet
+    print_status "Installing python-dotenv..."
+    pip install python-dotenv --quiet
+    print_status "Installing pyyaml..."
+    pip install pyyaml --quiet
+    print_status "Installing openai, together..."
+    pip install openai together --quiet
     
-    print_success "Python packages installed"
+    print_success "Python virtual environment set up successfully"
 }
 
 install_csmith() {
@@ -204,7 +234,7 @@ install_compcert() {
 build_extractor() {
     print_status "Building function extractor..."
     
-    local extractor_dir="databaseconstructor/functionextractor"
+    local extractor_dir="dbconstructor/functionextractor"
     local build_dir="$extractor_dir/build"
     
     if [ ! -d "$extractor_dir" ]; then
@@ -213,7 +243,7 @@ build_extractor() {
     fi
     
     # Check if already built
-    if [ -f "$build_dir/bin/functionExtract" ]; then
+    if [ -f "$build_dir/bin/functionextractor" ]; then
         print_success "Function extractor is already built"
         return 0
     fi
@@ -250,7 +280,7 @@ build_extractor() {
 build_profiler() {
     print_status "Building profiler..."
     
-    local profiler_dir="profiler"
+    local profiler_dir="dbconstructor/profiler"
     local build_dir="$profiler_dir/build"
     
     if [ ! -d "$profiler_dir" ]; then
@@ -297,6 +327,13 @@ verify_installation() {
     
     local all_good=true
     
+    # Check if virtual environment exists
+    if [ ! -d ".venv" ]; then
+        print_error "Virtual environment directory '.venv' not found"
+        all_good=false
+        return 1
+    fi
+    
     # Check Python
     if ! check_python_version; then
         all_good=false
@@ -319,30 +356,36 @@ verify_installation() {
     fi
     
     # Check built binaries
-    if [ -f "databaseconstructor/functionextractor/build/bin/functionextractor" ]; then
+    if [ -f "dbconstructor/functionextractor/build/bin/functionextractor" ]; then
         print_success "Function extractor is built"
     else
         print_error "Function extractor is not built"
         all_good=false
     fi
     
-    if [ -f "profiler/build/bin/profiler" ]; then
+    if [ -f "dbconstructor/profiler/build/bin/profiler" ]; then
         print_success "Profiler is built"
     else
         print_error "Profiler is not built"
         all_good=false
     fi
     
-    # Check Python packages
-    local packages=("diopter" "termcolor" "openai" "together")
-    for pkg in "${packages[@]}"; do
-        if python3 -c "import $pkg" 2>/dev/null; then
-            print_success "Python package '$pkg' is installed"
-        else
-            print_error "Python package '$pkg' is not installed"
-            all_good=false
-        fi
-    done
+    # Check Python packages (in virtual environment)
+    local packages=("diopter" "tqdm" "dotenv" "yaml" "openai" "together")
+    local venv_python=".venv/bin/python"
+    if [ -f "$venv_python" ]; then
+        for pkg in "${packages[@]}"; do
+            if "$venv_python" -c "import $pkg" 2>/dev/null; then
+                print_success "Python package '$pkg' is installed in virtual environment"
+            else
+                print_error "Python package '$pkg' is not installed in virtual environment"
+                all_good=false
+            fi
+        done
+    else
+        print_error "Virtual environment not found at .venv/"
+        all_good=false
+    fi
     
     # Check CSMITH_HOME
     if [ -n "$CSMITH_HOME" ] && [ -f "$CSMITH_HOME/include/csmith.h" ]; then
@@ -379,7 +422,7 @@ main() {
     # Install dependencies step by step
     install_system_dependencies
     install_clang
-    install_python_packages
+    setup_python_environment
     install_csmith
     install_compcert
     
@@ -390,8 +433,13 @@ main() {
     print_status "Setup completed!"
     verify_installation
     
-    print_status "Setup script finished."
-    print_status "Note: If this is your first time running the setup, please run 'source ~/.bashrc' to load environment variables."
+    echo ""
+    print_success "=== SETUP COMPLETE! ==="
+    echo ""
+    print_success "Virtual environment created at .venv/"
+    print_status "To activate: source .venv/bin/activate"
+    echo ""
+    print_warning "Note: If this is your first time running setup, please run 'source ~/.bashrc' to load CSMITH_HOME"
 }
 
 # Run main function
