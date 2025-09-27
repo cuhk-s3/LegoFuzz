@@ -254,22 +254,41 @@ build_extractor() {
     
     # Configure with CMake using clang-20
     print_status "Configuring function extractor with clang-20..."
-    cmake -DCMAKE_C_COMPILER=clang-20 \
+    if ! cmake -DCMAKE_C_COMPILER=clang-20 \
         -DCMAKE_CXX_COMPILER=clang++-20 \
         -DCMAKE_BUILD_TYPE=Release \
         -DLLVM_DIR=/usr/lib/llvm-20/cmake \
+        -DClang_DIR=/usr/lib/llvm-20/lib/cmake/clang \
         -G Ninja \
-        .. > /dev/null 2>&1
+        .. > cmake_config.log 2>&1; then
+        print_error "Function extractor CMake configuration failed!"
+        print_error "Check the log: $build_dir/cmake_config.log"
+        print_warning "Common issues:"
+        print_warning "  - LLVM development libraries not installed"
+        print_warning "  - Clang-20 not properly installed" 
+        print_warning "  - Try: sudo apt-get install llvm-20-dev libclang-20-dev"
+        cd - > /dev/null
+        return 1
+    fi
 
-    
     # Build
     print_status "Building function extractor..."
-    ninja > /dev/null 2>&1
+    if ! ninja > ninja_build.log 2>&1; then
+        print_error "Function extractor build failed!"
+        print_error "Check the log: $build_dir/ninja_build.log"
+        print_warning "Common issues:"
+        print_warning "  - Missing source files or dependencies"
+        print_warning "  - Compilation errors in C++ code"
+        cd - > /dev/null
+        return 1
+    fi
     
     if [ -f "bin/functionextractor" ]; then
         print_success "Function extractor built successfully"
     else
-        print_error "Function extractor build failed"
+        print_error "Function extractor binary not found after build"
+        print_error "Expected: $build_dir/bin/functionextractor"
+        cd - > /dev/null
         return 1
     fi
     
@@ -300,21 +319,41 @@ build_profiler() {
     
     # Configure with CMake using clang-20
     print_status "Configuring profiler with clang-20..."
-    cmake -DCMAKE_C_COMPILER=clang-20 \
+    if ! cmake -DCMAKE_C_COMPILER=clang-20 \
           -DCMAKE_CXX_COMPILER=clang++-20 \
           -DCMAKE_BUILD_TYPE=Release \
           -DLLVM_DIR=/usr/lib/llvm-20/cmake \
+          -DClang_DIR=/usr/lib/llvm-20/lib/cmake/clang \
           -G Ninja \
-          .. > /dev/null 2>&1
+          .. > cmake_config.log 2>&1; then
+        print_error "Profiler CMake configuration failed!"
+        print_error "Check the log: $build_dir/cmake_config.log"
+        print_warning "Common issues:"
+        print_warning "  - LLVM development libraries not installed"
+        print_warning "  - Clang-20 not properly installed"
+        print_warning "  - Try: sudo apt-get install llvm-20-dev libclang-20-dev"
+        cd - > /dev/null
+        return 1
+    fi
     
     # Build
     print_status "Building profiler..."
-    ninja > /dev/null 2>&1
+    if ! ninja > ninja_build.log 2>&1; then
+        print_error "Profiler build failed!"
+        print_error "Check the log: $build_dir/ninja_build.log"
+        print_warning "Common issues:"
+        print_warning "  - Missing source files or dependencies"
+        print_warning "  - Compilation errors in C++ code"
+        cd - > /dev/null
+        return 1
+    fi
     
     if [ -f "bin/profiler" ]; then
         print_success "Profiler built successfully"
     else
-        print_error "Profiler build failed"
+        print_error "Profiler binary not found after build"
+        print_error "Expected: $build_dir/bin/profiler"
+        cd - > /dev/null
         return 1
     fi
     
