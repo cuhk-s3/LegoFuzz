@@ -42,8 +42,8 @@ usage() {
     echo "  --help                Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0 --src ./c_files --dst ./functions.json"
-    echo "  $0 --src ./source_code --dst ./my_database.json --cpu 8"
+    echo "  $0 --src ./c_files --dst ./functions.jsonl"
+    echo "  $0 --src ./source_code --dst ./my_database.jsonl --cpu 8"
 }
 
 # Default values
@@ -118,8 +118,8 @@ print_status "Temp directory: $TEMP_DIR"
 
 # Create temporary directories
 mkdir -p "$TEMP_DIR"
-FUNCTIONS_JSON="$TEMP_DIR/functions.json"
-FUNCTIONS_IO_JSON="$TEMP_DIR/functions_io.json"
+FUNCTIONS_JSON="$TEMP_DIR/functions.jsonl"
+FUNCTIONS_IO_JSON="$TEMP_DIR/functions_io.jsonl"
 
 print_status "Created temporary directory: $TEMP_DIR"
 

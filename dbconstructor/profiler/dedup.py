@@ -63,8 +63,13 @@ def update_function_names(json_file, output_file=None):
     replace all occurrences (including tag_envs, profile, etc.) in that item.
     If output_file is None, write back to the original file.
     """
+    # First pass: read all data and collect function names
+    data = []
     with open(json_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        for line in f:
+            line = line.strip()
+            if line:  # skip empty lines
+                data.append(json.loads(line))
 
     name_instances = defaultdict(list)
 
@@ -101,24 +106,25 @@ def update_function_names(json_file, output_file=None):
             partial_map = idx_map[idx]
             data[idx] = recursive_replace(item, partial_map)
 
-    # Write back to original file or specified output file
+    # Write back to JSONL format
     target_file = output_file if output_file else json_file
     with open(target_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        for item in data:
+            f.write(json.dumps(item) + "\n")
 
     if output_file:
-        print(f"Updated JSON saved to {target_file}")
+        print(f"Updated JSONL saved to {target_file}")
     else:
-        print(f"JSON file updated in-place: {target_file}")
+        print(f"JSONL file updated in-place: {target_file}")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Remove duplicate function names in JSON database"
+        description="Remove duplicate function names in JSONL database"
     )
-    parser.add_argument("input", help="Input JSON file path")
+    parser.add_argument("input", help="Input JSONL file path")
     parser.add_argument(
-        "-o", "--output", help="Output JSON file path (default: update in-place)"
+        "-o", "--output", help="Output JSONL file path (default: update in-place)"
     )
     parser.add_argument(
         "--backup",
