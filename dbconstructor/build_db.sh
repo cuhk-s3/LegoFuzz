@@ -137,7 +137,7 @@ fi
 
 # Extract functions
 print_status "Extracting functions from C files..."
-./extract.py --src "$SRC_DIR" --dst "$FUNCTIONS_JSON" --cpu "$CPU_COUNT"
+unbuffer ./extract.py --src "$SRC_DIR" --dst "$FUNCTIONS_JSON" --cpu "$CPU_COUNT"
 
 if [[ $? -ne 0 ]]; then
     print_error "Failed to extract functions"
@@ -151,7 +151,7 @@ cd ..
 print_status "Generating I/O pairs with verification..."
 cd iogenerator
 
-./generate.py --src "$FUNCTIONS_JSON" --dst "$FUNCTIONS_IO_JSON" --cpu "$CPU_COUNT"
+unbuffer ./generate.py --src "$FUNCTIONS_JSON" --dst "$FUNCTIONS_IO_JSON" --cpu "$CPU_COUNT"
 
 if [[ $? -ne 0 ]]; then
     print_error "Failed to generate I/O pairs"
@@ -175,7 +175,7 @@ fi
 
 # Profile functions
 print_status "Step 3/3: Profiling functions..."
-./profile.py --src "$FUNCTIONS_IO_JSON" --dst "$OUTPUT_DATABASE"
+unbuffer ./profile.py --src "$FUNCTIONS_IO_JSON" --dst "$OUTPUT_DATABASE"
 
 if [[ $? -ne 0 ]]; then
     print_error "Failed to profile functions"
@@ -186,7 +186,7 @@ print_success "Function profiling completed"
 
 # Deduplication
 print_status "Running deduplication..."
-./dedup.py "$OUTPUT_DATABASE"
+unbuffer ./dedup.py "$OUTPUT_DATABASE"
 
 if [[ $? -ne 0 ]]; then
     print_warning "Deduplication failed, but continuing..."
