@@ -147,6 +147,9 @@ def extract_one_file(src_file):
                 r"typedef\s+([\w\s\*\_]+)\s([\w\_]+)", item_json["typedef"]
             )
             if len(matched_typedef) > 0:
+                type_replace, type_orig = matched_typedef[0]
+                if re.search(rf"\b{re.escape(type_orig)}\b", type_replace):
+                    continue
                 to_replace_typedef_list.append(matched_typedef[0])
         elif "global" in item_json:
             if "struct" not in item_json["global"]:
