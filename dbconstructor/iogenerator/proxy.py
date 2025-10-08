@@ -60,25 +60,20 @@ def generate_proxy_function_hide_pointer(input_func:Function, synthesized_input:
         #  base type or a pointer of base type
         if proxy_args_type[idx] == input_func.args_type[idx]:
             call_args_to_input_func.append(proxy_args_var[idx])
-        # pointer
+        # pointer - always use array mode
         elif proxy_args_type[idx] == VarType.get_base_type(input_func.args_type[idx]):
             proxy_args_idx_base_type = VarType.get_base_type(proxy_args_type[idx])
-            match random.choice(['pointer', 'array']):
-                case 'pointer':
-                    # call arg
-                    call_args_to_input_func.append(f"&({proxy_args_var[idx]})")
-                case 'array':
-                    proxy_var_arr = f"proxy_{generate_random_string(5)}"
-                    # randomly decide arrat length, use [10, 20)
-                    arr_len = random.randint(10, 20)
-                    # initialize array
-                    arr_values = []
-                    for _ in range(arr_len):
-                        arr_values.append(random.choice([f"{proxy_args_var[idx]}", str(VarType.get_random_value(proxy_args_idx_base_type))]))
-                    arr_init = ', '.join(arr_values)
-                    pre_call_to_input_func.append(f"{VarType.to_str(proxy_args_idx_base_type)} {proxy_var_arr}[{arr_len}] = {{ {arr_init} }};")
-                    # call arg
-                    call_args_to_input_func.append(proxy_var_arr)
+            proxy_var_arr = f"proxy_{generate_random_string(5)}"
+            # randomly decide array length, use [10, 20)
+            arr_len = random.randint(10, 20)
+            # initialize array
+            arr_values = []
+            for _ in range(arr_len):
+                arr_values.append(random.choice([f"{proxy_args_var[idx]}", str(VarType.get_random_value(proxy_args_idx_base_type))]))
+            arr_init = ', '.join(arr_values)
+            pre_call_to_input_func.append(f"{VarType.to_str(proxy_args_idx_base_type)} {proxy_var_arr}[{arr_len}] = {{ {arr_init} }};")
+            # call arg
+            call_args_to_input_func.append(proxy_var_arr)
         # unusual types such as pointer
         else:
             raise VarType(f"(TODO) Unsupported type, maybe a struct.")
@@ -148,22 +143,18 @@ def generate_proxy_function_expose_pointer(input_func:Function, synthesized_inpu
                 pre_call_to_input_func.append(f"{VarType.to_str(proxy_args_idx_base_type)} {proxy_var} = *{proxy_args_var[idx]};")
                 # mutate original value
                 pre_call_to_input_func.append(f"*{proxy_args_var[idx]} = {synthesized_input[idx]};")
-                match random.choice(['pointer', 'array']):
-                    case 'pointer':
-                        # call arg
-                        call_args_to_input_func.append(proxy_args_var[idx])
-                    case 'array':
-                        proxy_var_arr = f"proxy_{generate_random_string(5)}"
-                        # randomly decide arrat length, use [10, 20)
-                        arr_len = random.randint(10, 20)
-                        # initialize array
-                        arr_values = []
-                        for _ in range(arr_len):
-                            arr_values.append(random.choice([f"*{proxy_args_var[idx]}", str(VarType.get_random_value(proxy_args_idx_base_type))]))
-                        arr_init = ', '.join(arr_values)
-                        pre_call_to_input_func.append(f"{VarType.to_str(proxy_args_idx_base_type)} {proxy_var_arr}[{arr_len}] = {{ {arr_init} }};")
-                        # call arg
-                        call_args_to_input_func.append(proxy_var_arr)
+                # always use array mode for consistency
+                proxy_var_arr = f"proxy_{generate_random_string(5)}"
+                # randomly decide array length, use [10, 20)
+                arr_len = random.randint(10, 20)
+                # initialize array
+                arr_values = []
+                for _ in range(arr_len):
+                    arr_values.append(random.choice([f"*{proxy_args_var[idx]}", str(VarType.get_random_value(proxy_args_idx_base_type))]))
+                arr_init = ', '.join(arr_values)
+                pre_call_to_input_func.append(f"{VarType.to_str(proxy_args_idx_base_type)} {proxy_var_arr}[{arr_len}] = {{ {arr_init} }};")
+                # call arg
+                call_args_to_input_func.append(proxy_var_arr)
                 # recover original pointed-to value
                 post_call_to_input_func.append(f"*{proxy_args_var[idx]} = {proxy_var};")
         # unusual types such as pointer
