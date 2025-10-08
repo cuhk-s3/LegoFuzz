@@ -39,7 +39,8 @@ SAN_SAN = Sanitizer(
     checked_warnings=False,
     use_ub_address_sanitizer=True,
     use_ccomp_if_available=False,
-    debug=DEBUG,
+    debug=True,
+    sanitizer_env_variables={"ASAN_OPTIONS": "detect_leaks=0"}
 )  # sanitizers only
 SAN_CCOMP = this_CComp.get_system_ccomp()  # CompCert only
 

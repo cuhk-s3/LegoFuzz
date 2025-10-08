@@ -161,7 +161,7 @@ setup_python_environment() {
     
     # Install required packages
     print_status "Installing diopter..."
-    pip install diopter==0.0.24 --quiet
+    pip install diopter==0.0.31 --quiet
     print_status "Installing tqdm..."
     pip install tqdm --quiet
     print_status "Installing python-dotenv..."
