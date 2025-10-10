@@ -15,6 +15,8 @@ from iogenerator.variable import VarType
 
 CC1 = "gcc"  # use two compilers to avoid unspecified behavior
 CC2 = "clang"
+COMPILERS = ["gcc", "clang"]  # test with both compilers
+OPT_LEVELS = ["-O0", "-O1", "-O2", "-O3"]  # optimization levels to test
 NUM_ENV = 5  # number of env variables used for each tag, "1" means one env_val, e.g., Tag1:tag_val:env_val
 PROFILER = f"{os.path.dirname(__file__)}/build/bin/profiler --mode=expr"
 
@@ -35,15 +37,14 @@ class VarValue(Enum):
 class Var:
     """Variable"""
 
-    var_name: str  # variable name
-    var_type: str  # variable type as string
-    var_value: int  # value
-    is_stable: bool = (
-        True  # if the variable values is stable, i.e., never changed or len(set(values))<=1.
-    )
-    is_constant: bool = False  # variable has "const" keyword
-    is_global: bool = False  # if the vairable has global storage
-    scope_id: int = -1  # scope id of the variable
+    def __init__(self):
+        self.var_name: str = ""  # variable name
+        self.var_type: str = ""  # variable type as string
+        self.var_value: int = 0  # value (determined from multiple optimization levels)
+        self.is_stable: bool = True  # if the variable is stable across all optimization levels and executions
+        self.is_constant: bool = False  # variable has "const" keyword
+        self.is_global: bool = False  # if the vairable has global storage
+        self.scope_id: int = -1  # scope id of the variable
 
 
 class Tag:
@@ -87,6 +88,10 @@ def run_cmd(cmd, timeout=10, DEBUG=False):
         out = process.stdout.decode("utf-8")
         if process.returncode != 0:
             ret = CMD.Error
+            # Include stderr in output when there's an error
+            stderr = process.stderr.decode("utf-8")
+            if stderr:
+                out = out + "\nSTDERR:\n" + stderr
     except sp.TimeoutExpired:
         if DEBUG:
             print(
@@ -295,6 +300,12 @@ return v0; \
         """
         with open(src_file, "r") as f:
             src = f.read()
+        
+        # ALWAYS add stdio.h at the very beginning for printf in tag functions
+        # Even if stdio.h exists later in the file, we need it before tag definitions
+        if not src.startswith("#include <stdio.h>") and not src.startswith("#include<stdio.h>"):
+            src = "#include <stdio.h>\n" + src
+        
         for tag_id in self.tags:
             envs = self.get_envs(tag_id, env_num=NUM_ENV)
             for env_id in envs:
@@ -343,7 +354,7 @@ return v0; \
     def profiling(self, filename, func_name):
         """
         Instrument file with profiler;
-        Run and collect values.
+        Run and collect values for multiple optimization levels.
         Note: we would rename tags to Tag{tag_id}_{func_name} before profiling.
         """
         # profiling
@@ -359,107 +370,176 @@ return v0; \
         self.static_analysis(filename)
         self.add_tags(filename)
 
-        with tempfile.NamedTemporaryFile(suffix=".out", delete=True) as tmp_f:
-            tmp_f.close()
-            exe_out = tmp_f.name
-            # run with CC1
-            ret, _ = run_cmd(f"{CC1} -w -O0 {filename} -o {exe_out}", DEBUG=self.DEBUG)
-            if ret != CMD.OK:
-                if os.path.exists(exe_out):
+        # Run with different compilers and optimization levels
+        all_profile_outputs = {}  # key: (compiler, opt_level), value: profile output
+        
+        for compiler in COMPILERS:
+            for opt_level in OPT_LEVELS:
+                with tempfile.NamedTemporaryFile(suffix=".out", delete=True) as tmp_f:
+                    tmp_f.close()
+                    exe_out = tmp_f.name
+                    # compile with current compiler and opt level
+                    ret, compile_err = run_cmd(f"{compiler} -w {opt_level} {filename} -o {exe_out}", DEBUG=self.DEBUG)
+                    if ret != CMD.OK:
+                        if os.path.exists(exe_out):
+                            os.remove(exe_out)
+                        if self.DEBUG:
+                            print(
+                                datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                                f">>compile with {compiler} {opt_level} failed, skipping.",
+                                flush=True,
+                            )
+                        # Skip this compiler/opt combination if compilation fails
+                        continue
+                    ret, profile_out = run_cmd(exe_out, timeout=3, DEBUG=self.DEBUG)
+                    if ret != CMD.OK:
+                        os.remove(exe_out)
+                        if self.DEBUG:
+                            print(
+                                datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                                f">>run with {exe_out} at {compiler} {opt_level} failed, skipping.",
+                                flush=True,
+                            )
+                        # Skip this compiler/opt combination if execution fails
+                        continue
                     os.remove(exe_out)
-                if self.DEBUG:
-                    print(
-                        datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        ">>run_cmd with {CC1} failed.",
-                        flush=True,
-                    )
-                raise ProfilerError
-            ret, profile_out_1 = run_cmd(exe_out, timeout=3, DEBUG=self.DEBUG)
-            if ret != CMD.OK:
-                os.remove(exe_out)
-                if self.DEBUG:
-                    print(
-                        datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        ">>run_cmd with {exe_out} failed.",
-                        flush=True,
-                    )
-                raise ProfilerError
-            os.remove(exe_out)
+                    all_profile_outputs[(compiler, opt_level)] = profile_out
+        
+        # Check if we got any outputs
+        if not all_profile_outputs:
+            raise ProfilerError
 
-        raw_values_1 = [
-            [item.split(":")[0].replace("Tag", "")]
-            + [x for x in item.split(":")[1:] if x != ""]
-            for item in profile_out_1.split()
-            if "Tag" in item
-        ]
-
-        if self.DEBUG:
-            print(
-                datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                f">>length of raw_values: {len(raw_values_1)}",
-                flush=True,
-            )
-        # construct tags
+        # Process outputs for all compilers and optimization levels
         self.alive_tags = []
-        # get values and check stability with raw_values_1
-        checked_tag_id = (
-            []
-        )  # all tag_id that have been checked. A tag's env is not stable if it has never been checked.
-        for i in range(len(raw_values_1)):
-            tag_info = raw_values_1[i]
-            curr_tag_id = int(tag_info[0])
-            curr_num_env = len(tag_info) - 2
-            curr_tag_var_value = int(tag_info[1])
-            curr_tag_env_value_list = (
-                [] if curr_num_env == 0 else list(map(int, tag_info[2:]))
-            )
-            # Test the stability of the tag_var
-            if hasattr(self.tags[curr_tag_id].tag_var, "var_value"):
-                if curr_tag_var_value != self.tags[curr_tag_id].tag_var.var_value:
-                    self.tags[curr_tag_id].tag_var.is_stable = False
-            else:
-                self.tags[curr_tag_id].tag_var.var_value = curr_tag_var_value
-            if (
-                curr_tag_var_value == INVALID_TAG_VALUE
-            ):  # invalid tag value because of null pointer. should only in env vars
-                self.tags[curr_tag_id].tag_var.is_stable = False
-            # Test the stability of each env var
-            for env_i in range(curr_num_env):
-                if hasattr(self.tags[curr_tag_id].tag_envs[env_i], "var_value"):
-                    if (
-                        curr_tag_env_value_list[env_i]
-                        != self.tags[curr_tag_id].tag_envs[env_i].var_value
-                    ):
-                        self.tags[curr_tag_id].tag_envs[env_i].is_stable = False
-                    checked_tag_id.append(
-                        curr_tag_id
-                    )  # if we are not assigning the value for the first time, the value is now checked.
-                else:
-                    self.tags[curr_tag_id].tag_envs[env_i].var_value = (
-                        curr_tag_env_value_list[env_i]
-                    )
-                if (
-                    curr_tag_env_value_list[env_i] == INVALID_TAG_VALUE
-                ):  # invalid tag value because of null pointer. should only in env vars
-                    self.tags[curr_tag_id].tag_envs[env_i].is_stable = False
-            if curr_tag_id not in self.alive_tags:
-                self.alive_tags.append(curr_tag_id)
-        # all tag_id that have been checked. A tag's env is not stable if it has never been checked.
+        # Use temporary dictionaries to collect values across compilers and optimization levels
+        temp_var_values = {}  # {tag_id: {(compiler, opt_level): [value1, value2, ...]}}
+        temp_env_values = {}  # {tag_id: {env_i: {(compiler, opt_level): [value1, value2, ...]}}}
+        
+        for (compiler, opt_level), profile_out in all_profile_outputs.items():
+            raw_values = [
+                [item.split(":")[0].replace("Tag", "")]
+                + [x for x in item.split(":")[1:] if x != ""]
+                for item in profile_out.split()
+                if "Tag" in item
+            ]
+            
+            for i in range(len(raw_values)):
+                tag_info = raw_values[i]
+                curr_tag_id = int(tag_info[0])
+                curr_num_env = len(tag_info) - 2
+                curr_tag_var_value = int(tag_info[1])
+                curr_tag_env_value_list = (
+                    [] if curr_num_env == 0 else list(map(int, tag_info[2:]))
+                )
+                
+                # Initialize temp storage
+                if curr_tag_id not in temp_var_values:
+                    temp_var_values[curr_tag_id] = {}
+                    temp_env_values[curr_tag_id] = {}
+                
+                if (compiler, opt_level) not in temp_var_values[curr_tag_id]:
+                    temp_var_values[curr_tag_id][(compiler, opt_level)] = []
+                
+                # Store tag_var value
+                temp_var_values[curr_tag_id][(compiler, opt_level)].append(curr_tag_var_value)
+                
+                # Store env values
+                for env_i in range(curr_num_env):
+                    if env_i not in temp_env_values[curr_tag_id]:
+                        temp_env_values[curr_tag_id][env_i] = {}
+                    if (compiler, opt_level) not in temp_env_values[curr_tag_id][env_i]:
+                        temp_env_values[curr_tag_id][env_i][(compiler, opt_level)] = []
+                    temp_env_values[curr_tag_id][env_i][(compiler, opt_level)].append(curr_tag_env_value_list[env_i])
+                
+                if curr_tag_id not in self.alive_tags:
+                    self.alive_tags.append(curr_tag_id)
+        
+        # Now determine final var_value and is_stable based on all compilers and optimization levels
         for tag_id in self.alive_tags:
-            if tag_id not in checked_tag_id:
-                for env_i in range(len(self.tags[tag_id].tag_envs)):
-                    self.tags[tag_id].tag_envs[env_i].is_stable = False
+            # Determine tag_var stability and value
+            all_values = []
+            for compiler in COMPILERS:
+                for opt_level in OPT_LEVELS:
+                    if (compiler, opt_level) in temp_var_values[tag_id]:
+                        all_values.extend(temp_var_values[tag_id][(compiler, opt_level)])
+            
+            # Check if all values are the same (stable) and not invalid
+            if all_values:
+                # Filter out invalid values
+                valid_values = [v for v in all_values if v != INVALID_TAG_VALUE]
+                if valid_values:
+                    # Use gcc -O0 value if available, otherwise use first valid value
+                    if ("gcc", "-O0") in temp_var_values[tag_id] and temp_var_values[tag_id][("gcc", "-O0")]:
+                        self.tags[tag_id].tag_var.var_value = temp_var_values[tag_id][("gcc", "-O0")][0]
+                    else:
+                        self.tags[tag_id].tag_var.var_value = valid_values[0]
+                    # Stable only if all values are the same
+                    self.tags[tag_id].tag_var.is_stable = (len(set(valid_values)) == 1)
+                else:
+                    # All values are invalid
+                    self.tags[tag_id].tag_var.var_value = INVALID_TAG_VALUE
+                    self.tags[tag_id].tag_var.is_stable = False
+            
+            # Determine env vars stability and value
+            for env_i in range(len(self.tags[tag_id].tag_envs)):
+                if env_i in temp_env_values[tag_id]:
+                    all_env_values = []
+                    for compiler in COMPILERS:
+                        for opt_level in OPT_LEVELS:
+                            if (compiler, opt_level) in temp_env_values[tag_id][env_i]:
+                                all_env_values.extend(temp_env_values[tag_id][env_i][(compiler, opt_level)])
+                    
+                    if all_env_values:
+                        # Filter out invalid values
+                        valid_env_values = [v for v in all_env_values if v != INVALID_TAG_VALUE]
+                        if valid_env_values:
+                            # Use gcc -O0 value if available, otherwise use first valid value
+                            if ("gcc", "-O0") in temp_env_values[tag_id][env_i] and temp_env_values[tag_id][env_i][("gcc", "-O0")]:
+                                self.tags[tag_id].tag_envs[env_i].var_value = temp_env_values[tag_id][env_i][("gcc", "-O0")][0]
+                            else:
+                                self.tags[tag_id].tag_envs[env_i].var_value = valid_env_values[0]
+                            # Stable only if all values are the same
+                            self.tags[tag_id].tag_envs[env_i].is_stable = (len(set(valid_env_values)) == 1)
+                        else:
+                            # All values are invalid
+                            self.tags[tag_id].tag_envs[env_i].var_value = INVALID_TAG_VALUE
+                            self.tags[tag_id].tag_envs[env_i].is_stable = False
+        
         # serialize tags to json
         serialized_tags = {}
         for tag_id in self.tags:
             tag = self.tags[tag_id]
+            # Serialize tag_var manually to ensure correct format
+            tag_var_dict = {}
+            if tag.tag_var:
+                tag_var_dict = {
+                    "var_name": tag.tag_var.var_name,
+                    "var_type": tag.tag_var.var_type,
+                    "var_value": tag.tag_var.var_value,
+                    "is_stable": tag.tag_var.is_stable,
+                    "is_constant": tag.tag_var.is_constant,
+                    "is_global": tag.tag_var.is_global,
+                    "scope_id": tag.tag_var.scope_id,
+                }
+            
+            # Serialize tag_envs manually to ensure correct format
+            tag_envs_list = []
+            for env in getattr(tag, "tag_envs", []):
+                tag_envs_list.append({
+                    "var_name": env.var_name,
+                    "var_type": env.var_type,
+                    "var_value": env.var_value,
+                    "is_stable": env.is_stable,
+                    "is_constant": env.is_constant,
+                    "is_global": env.is_global,
+                    "scope_id": env.scope_id,
+                })
+            
             serialized_tags[tag_id] = {
                 "tag_str": getattr(tag, "tag_str", ""),
                 "func_name": getattr(tag, "func_name", ""),
-                "tag_var": (
-                    getattr(tag, "tag_var", None).__dict__ if tag.tag_var else {}
-                ),
-                "tag_envs": [env.__dict__ for env in getattr(tag, "tag_envs", [])],
+                "tag_var": tag_var_dict,
+                "tag_envs": tag_envs_list,
                 "statement_id": getattr(tag, "statement_id", None),
             }
         code = re.sub(r"(?s)\bint\s+main\s*\([^)]*\)\s*\{.*?\}", "", self.src_orig)
