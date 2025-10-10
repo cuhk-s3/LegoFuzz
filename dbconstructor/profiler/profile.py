@@ -495,34 +495,45 @@ if __name__ == "__main__":
     functionDB = FunctionDB(args.SRC)
     with tqdm.tqdm(total=len(functionDB.all_functions)) as pbar:
         for func in functionDB.all_functions:
+            # create a temporary C file for profiling; ensure it's removed afterwards
             tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
-            tmp_f.close
-            with open(tmp_f.name, "w") as f:
-                for misc in func.misc:
-                    f.write(misc)
-                    f.write("\n")
-                f.write(func.function_body)
-                f.write("\n")
-                f.write("int main() {\n")
-                f.write(
-                    "{func_name}({func_io});\n".format(
-                        func_name=func.call_name,
-                        func_io=",".join(map(str, func.io_list[0][0])),
-                    )
-                )
-                f.write("return 0;\n")
-                f.write("}\n")
-
-            profiler = Profiler(DEBUG=False)
             try:
-                profiled_code, serialized_tags, alive_tags = profiler.profiling(
-                    tmp_f.name, func.call_name
-                )
-                func.function_body = profiled_code
-                func.profile = serialized_tags
-                func.alive_tags = alive_tags
-            except ProfilerError:
-                pass
+                tmp_name = tmp_f.name
+                tmp_f.close()
+                with open(tmp_name, "w") as f:
+                    for misc in func.misc:
+                        f.write(misc)
+                        f.write("\n")
+                    f.write(func.function_body)
+                    f.write("\n")
+                    f.write("int main() {\n")
+                    f.write(
+                        "{func_name}({func_io});\n".format(
+                            func_name=func.call_name,
+                            func_io=",".join(map(str, func.io_list[0][0])),
+                        )
+                    )
+                    f.write("return 0;\n")
+                    f.write("}\n")
+
+                profiler = Profiler(DEBUG=False)
+                try:
+                    profiled_code, serialized_tags, alive_tags = profiler.profiling(
+                        tmp_name, func.call_name
+                    )
+                    func.function_body = profiled_code
+                    func.profile = serialized_tags
+                    func.alive_tags = alive_tags
+                except ProfilerError:
+                    # profiling failed for this function; continue
+                    pass
+            finally:
+                # always remove the temporary file to avoid filling disk
+                try:
+                    if os.path.exists(tmp_name):
+                        os.remove(tmp_name)
+                except Exception:
+                    pass
             pbar.update(1)
 
     # Write to new function database
