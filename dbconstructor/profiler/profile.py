@@ -7,6 +7,7 @@ import random
 import subprocess as sp
 from enum import Enum, auto
 import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -551,6 +552,54 @@ class ProfilerError(Exception):
     pass
 
 
+def process_single_function(func, DEBUG=False):
+    """
+    Process a single function for profiling.
+    This function is thread-safe and can be called in parallel.
+    Returns: (func, success: bool)
+    """
+    tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
+    tmp_name = None
+    try:
+        tmp_name = tmp_f.name
+        tmp_f.close()
+        with open(tmp_name, "w") as f:
+            for misc in func.misc:
+                f.write(misc)
+                f.write("\n")
+            f.write(func.function_body)
+            f.write("\n")
+            f.write("int main() {\n")
+            f.write(
+                "{func_name}({func_io});\n".format(
+                    func_name=func.call_name,
+                    func_io=",".join(map(str, func.io_list[0][0])),
+                )
+            )
+            f.write("return 0;\n")
+            f.write("}\n")
+
+        profiler = Profiler(DEBUG=DEBUG)
+        try:
+            profiled_code, serialized_tags, alive_tags = profiler.profiling(
+                tmp_name, func.call_name
+            )
+            func.function_body = profiled_code
+            func.profile = serialized_tags
+            func.alive_tags = alive_tags
+            return func, True
+        except ProfilerError:
+            # profiling failed for this function
+            return func, False
+    finally:
+        # always remove the temporary file to avoid filling disk
+        if tmp_name and os.path.exists(tmp_name):
+            try:
+                os.remove(tmp_name)
+            except Exception:
+                pass
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -565,6 +614,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dst", dest="DST", required=True, help="path to the output function database."
     )
+    parser.add_argument(
+        "--cpu",
+        dest="CPU",
+        type=int,
+        default=4,
+        help="number of parallel CPU workers (default: 4).",
+    )
+    parser.add_argument(
+        "--debug", dest="DEBUG", action="store_true", help="print debug information."
+    )
 
     args = parser.parse_args()
     if not os.path.exists(args.SRC):
@@ -573,50 +632,28 @@ if __name__ == "__main__":
         exit(1)
 
     functionDB = FunctionDB(args.SRC)
-    with tqdm.tqdm(total=len(functionDB.all_functions)) as pbar:
-        for func in functionDB.all_functions:
-            # create a temporary C file for profiling; ensure it's removed afterwards
-            tmp_f = tempfile.NamedTemporaryFile(suffix=".c", delete=False)
-            try:
-                tmp_name = tmp_f.name
-                tmp_f.close()
-                with open(tmp_name, "w") as f:
-                    for misc in func.misc:
-                        f.write(misc)
-                        f.write("\n")
-                    f.write(func.function_body)
-                    f.write("\n")
-                    f.write("int main() {\n")
-                    f.write(
-                        "{func_name}({func_io});\n".format(
-                            func_name=func.call_name,
-                            func_io=",".join(map(str, func.io_list[0][0])),
-                        )
-                    )
-                    f.write("return 0;\n")
-                    f.write("}\n")
-
-                profiler = Profiler(DEBUG=False)
-                try:
-                    profiled_code, serialized_tags, alive_tags = profiler.profiling(
-                        tmp_name, func.call_name
-                    )
-                    func.function_body = profiled_code
-                    func.profile = serialized_tags
-                    func.alive_tags = alive_tags
-                except ProfilerError:
-                    # profiling failed for this function; continue
-                    pass
-            finally:
-                # always remove the temporary file to avoid filling disk
-                try:
-                    if os.path.exists(tmp_name):
-                        os.remove(tmp_name)
-                except Exception:
-                    pass
-            pbar.update(1)
+    
+    # Use ThreadPoolExecutor for parallel processing
+    results = []
+    with ThreadPoolExecutor(max_workers=args.CPU) as executor:
+        # Submit all tasks
+        future_to_func = {
+            executor.submit(process_single_function, func, args.DEBUG): func 
+            for func in functionDB.all_functions
+        }
+        
+        # Process completed tasks with progress bar
+        with tqdm.tqdm(total=len(functionDB.all_functions)) as pbar:
+            for future in as_completed(future_to_func):
+                func, success = future.result()
+                results.append((func, success))
+                pbar.update(1)
+    
+    # Sort results back to original order (to maintain consistency)
+    func_index = {id(f): i for i, f in enumerate(functionDB.all_functions)}
+    results.sort(key=lambda x: func_index[id(x[0])])
 
     # Write to new function database
     with open(args.DST, "w") as f:
-        for func in functionDB.all_functions:
+        for func, success in results:
             f.write(json.dumps(func.to_json()) + "\n")
