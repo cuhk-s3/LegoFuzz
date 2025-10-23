@@ -318,7 +318,8 @@ class Synthesizer:
                 synth_func_idx = random.randint(0, len(self.functionDB) - 1)
                 if (
                     self.functionDB[synth_func_idx].has_io
-                    and synth_func_idx not in used_func
+                    and synth_func_idx not in used_func 
+                    and self.functionDB[synth_func_idx].io_list[0][1] is not None
                 ):
                     break
             self.replace_valuetag_with_func(str(tag_id), synth_func_idx)
@@ -365,19 +366,32 @@ class Synthesizer:
                     "var_value": global_arr_value,
                 }
 
-    def synthesizer(self, dst_dir: Path):
+    def mutate_with_global_vars(self):
+        stmts = []
+        for var in GLOBAL_VARS:
+            if GLOBAL_VARS[var]['var_type'] == 'int':
+                stmts.append(f'    checksum ^= {GLOBAL_VARS[var]["var_name"]};\n')
+            else:
+                stmts.append(f'    for (int i = 0; i < {len(GLOBAL_VARS[var]["var_value"])}; i++) '
+                            f'checksum ^= {GLOBAL_VARS[var]["var_name"]}[i];\n')
+        return stmts
+        
+    def mutate_with_functions(self, function_idx):
+        func = self.functionDB[function_idx]
+        func_call = func.call_name + "(" + ",".join(map(str, func.io_list[0][0])) + ")"
+        return f'    checksum ^= {func_call};\n'
+
+    def synthesizer(self, dst_dir:Path):
         """
         Synthesize a source file by replacing variables/constants with function calls.
         """
         # randomly select a seed function
         while True:
-            seed_func_idx = random.randint(0, len(self.functionDB) - 1)
-            if (
-                self.functionDB[seed_func_idx].has_io
-                and hasattr(self.functionDB[seed_func_idx], "profile")
-                and self.functionDB[seed_func_idx].profile is not None
-                and len(self.functionDB[seed_func_idx].profile) > 0
-            ):
+            seed_func_idx = random.randint(0, len(self.functionDB)-1)
+            if (self.functionDB[seed_func_idx].has_io 
+                and hasattr(self.functionDB[seed_func_idx], "profile") 
+                and self.functionDB[seed_func_idx].profile is not None 
+                and len(self.functionDB[seed_func_idx].profile) > 0):
                 seed_func = self.functionDB[seed_func_idx]
                 if len(seed_func.alive_tags) > 0:
                     break
@@ -385,7 +399,7 @@ class Synthesizer:
         assert self.num_mutant >= 1
 
         succ_file_id = id_generator()
-        src_filename = str((dst_dir / f"{succ_file_id}_seed.c").absolute())
+        src_filename = str((dst_dir / f'{succ_file_id}_seed.c').absolute())
         with open(src_filename, "w") as f:
             f.write(seed_func.function_body)
 
@@ -402,43 +416,30 @@ class Synthesizer:
         all_syn_files = [src_filename]
         for num_i in range(self.num_mutant):
             if self.DEBUG:
-                print(
-                    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                    ">synthesize mutatant start",
-                    num_i,
-                    flush=True,
-                )
+                print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant start", num_i, flush=True)
             self.src_syn = copy(self.src_orig)
             used_func = [seed_func_idx]
             tgt_func = []
-            replaced_tags = {
-                seed_func_idx: []
-            }  # a dict that contains the replaced tags of used functions(ready to be tgts)
-
+            replaced_tags = {seed_func_idx: []} # a dict that contains the replaced tags of used functions(ready to be tgts)
+            
             if self.RAND:
                 repeat_time = random.randint(self.iter // 2, self.iter)
             else:
                 repeat_time = self.iter
-
+            
             for _ in range(repeat_time):
                 tgt_func_idx = random.choice(used_func)
                 self.tags = self.functionDB[tgt_func_idx].profile
-                synth_funcs = self.synthesize_one(
-                    tgt_func_idx, used_func, replaced_tags
-                )
+                synth_funcs = self.synthesize_one(tgt_func_idx, used_func, replaced_tags)
                 if synth_funcs != []:
                     tgt_func.append(tgt_func_idx)
                 if self.DEBUG:
-                    print(
-                        datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        "synth_funcs",
-                        synth_funcs,
-                    )
+                    print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "synth_funcs", synth_funcs)
                 # update replaced_tags
                 for synth_func in synth_funcs:
                     replaced_tags[synth_func] = []
                 self.insert_func_decl(synth_funcs)
-            dst_filename = f"{os.path.splitext(src_filename)[0]}_syn{num_i}.c"
+            dst_filename = f'{os.path.splitext(src_filename)[0]}_syn{num_i}.c'
             calls = []
             calls.extend(self.mutate_with_global_vars())
             for idx in tgt_func:
@@ -448,42 +449,32 @@ class Synthesizer:
                 f.write("/* -----Global Variables----- */\n")
                 for idx in GLOBAL_VARS:
                     keyword = "static" if random.randint(0, 1) == 0 else ""
-                    if GLOBAL_VARS[idx]["var_type"] == "int":
-                        f.write(
-                            f"{keyword} int {GLOBAL_VARS[idx]['var_name']} = {GLOBAL_VARS[idx]['var_value']};\n"
-                        )
+                    if GLOBAL_VARS[idx]['var_type'] == 'int':
+                        f.write(f"{keyword} int {GLOBAL_VARS[idx]['var_name']} = {GLOBAL_VARS[idx]['var_value']};\n")
                     else:
-                        f.write(
-                            f"{keyword} int {GLOBAL_VARS[idx]['var_name']}[{len(GLOBAL_VARS[idx]['var_value'])}] = {{"
-                        )
-                        f.write(", ".join(map(str, GLOBAL_VARS[idx]["var_value"])))
+                        f.write(f"{keyword} int {GLOBAL_VARS[idx]['var_name']}[{len(GLOBAL_VARS[idx]['var_value'])}] = {{")
+                        f.write(", ".join(map(str, GLOBAL_VARS[idx]['var_value'])))
                         f.write("};\n")
                 f.write("\n")
                 f.write("/* -----Synthesized Function----- */\n")
-                f.write("#include <csmith.h>")
                 f.write(self.src_syn)
                 f.write("\n")
                 f.write("#include <stdio.h>\n")
                 f.write("#include <inttypes.h>\n")
                 f.write("int main() {\n")
-                f.write("    int print_hash_value = 0;\n")
-                f.write("    platform_main_begin();\n")
-                f.write("    crc32_gentab();\n")
+                f.write("    unsigned int checksum = 0;\n")
+                calls = []
+                calls.extend(self.mutate_with_global_vars())
+                for idx in tgt_func:
+                    calls.append(self.mutate_with_functions(idx))
                 for call in calls:
                     f.write(call)
-                f.write(
-                    "    platform_main_end(crc32_context ^ 0xFFFFFFFFUL, print_hash_value);\n"
-                )
+                f.write("    printf(\"checksum = %u\\n\", checksum);\n")
                 f.write("    return 0;\n")
                 f.write("}\n")
             all_syn_files.append(dst_filename)
             if self.DEBUG:
-                print(
-                    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                    ">synthesize mutatant end",
-                    num_i,
-                    flush=True,
-                )
+                print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), ">synthesize mutatant end", num_i, flush=True)
 
         return seed_func_idx, all_syn_files, used_func
 

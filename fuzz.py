@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import glob
 import argparse
 import multiprocessing as mp
 import re
@@ -30,18 +31,32 @@ PROG_TIMEOUT = 10
 CCOMP_TIMEOUT = 60  # compcert timeout
 """TOOL"""
 CSMITH_HOME = os.environ["CSMITH_HOME"]
+
+def find_riscv_vector_include():
+    clang_path = sp.check_output(['which', 'clang'], text=True).strip()
+    clang_root = os.path.dirname(os.path.dirname(clang_path))
+    candidate_dirs = glob(os.path.join(clang_root, 'lib', 'clang', '*', 'include'))
+
+    for inc_dir in candidate_dirs:
+        if os.path.exists(os.path.join(inc_dir, 'riscv_vector.h')):
+            return os.path.join(inc_dir, 'riscv_vector.h')
+
+    raise FileNotFoundError("No path to include is found")
+CC_ARGS = f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
+
 CC = CompilationSetting(
     compiler=CompilerExe.get_system_gcc(),
     opt_level=OptLevel.O3,
-    flags=("-march=native", f"-I{CSMITH_HOME}/include"),
+    flags=CC_ARGS,
 )
-SAN_SAN = Sanitizer(
-    checked_warnings=False,
-    use_ub_address_sanitizer=True,
-    use_ccomp_if_available=False,
-    debug=True,
-    sanitizer_env_variables={"ASAN_OPTIONS": "detect_leaks=0"}
-)  # sanitizers only
+# SAN_SAN = Sanitizer(
+#     gcc=None,
+#     checked_warnings=False,
+#     use_ub_address_sanitizer=True,
+#     use_ccomp_if_available=False,
+#     debug=True,
+#     sanitizer_env_variables={"ASAN_OPTIONS": "detect_leaks=0"}
+# )  # sanitizers only
 SAN_CCOMP = this_CComp.get_system_ccomp()  # CompCert only
 
 
@@ -113,15 +128,72 @@ def read_checksum(data):
 
 
 def check_sanitizers(src):
-    """Check validity with sanitizers"""
-    with open(src, "r") as f:
-        code = f.read()
-    prog = SourceProgram(code=code, language=Language.C)
-    preprog = CC.preprocess_program(prog, make_compiler_agnostic=True)
-    if DEBUG:
-        print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "SAN.sanitize", flush=True)
-    if not SAN_SAN.sanitize(preprog):
-        return False
+    """Check validity with sanitizers using clang with -fsanitize=address,undefined"""
+    tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
+    tmp_f.close()
+    exe = tmp_f.name
+    
+    try:
+        # Compile with clang and sanitizers
+        compile_cmd = f"clang {src} -fsanitize=address,undefined {CC_ARGS} -g -O1 -o {exe}"
+        if DEBUG:
+            print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "SAN.compile", flush=True)
+        
+        ret, out = run_cmd(compile_cmd, COMPILER_TIMEOUT)
+        if ret != 0:
+            # Compilation failed, likely due to errors
+            if DEBUG:
+                print(f"Sanitizer compilation failed: {out}", flush=True)
+            if os.path.exists(exe):
+                os.remove(exe)
+            return False
+        
+        # Run the compiled program with sanitizers
+        if DEBUG:
+            print(datetime.now().strftime("%d/%m/%Y %H:%M:%S"), "SAN.run", flush=True)
+        
+        # Set ASAN options to not leak detect and abort on error
+        env = os.environ.copy()
+        env["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"
+        env["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
+        
+        process = sp.Popen(
+            [exe],
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
+            env=env
+        )
+        
+        try:
+            stdout, stderr = process.communicate(timeout=PROG_TIMEOUT)
+            ret_code = process.returncode
+            
+            # Check if sanitizer detected any issues
+            # Non-zero return code or sanitizer error messages indicate UB
+            if ret_code != 0:
+                if DEBUG:
+                    print(f"Sanitizer detected UB (exit code: {ret_code})", flush=True)
+                    print(f"stderr: {stderr.decode('utf-8', errors='ignore')}", flush=True)
+                return False
+            
+            # Check stderr for sanitizer messages
+            stderr_str = stderr.decode('utf-8', errors='ignore')
+            if 'Sanitizer' in stderr_str or 'runtime error' in stderr_str:
+                if DEBUG:
+                    print(f"Sanitizer detected UB in stderr", flush=True)
+                return False
+                
+        except sp.TimeoutExpired:
+            process.kill()
+            if DEBUG:
+                print("Sanitizer check timeout", flush=True)
+            return False
+            
+    finally:
+        # Clean up
+        if os.path.exists(exe):
+            os.remove(exe)
+    
     return True
 
 
@@ -173,7 +245,7 @@ def compile_and_run(compiler, src):
     tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
     tmp_f.close()
     exe = tmp_f.name
-    cmd = f"{compiler} {src} -I{CSMITH_HOME}/include -o {exe}"
+    cmd = f"{compiler} {src} {CC_ARGS} -o {exe}"
     ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
     if ret == 124:  # another compile chance when timeout
         time.sleep(1)
@@ -188,7 +260,7 @@ def compile_and_run(compiler, src):
         if os.path.exists(exe):
             os.remove(exe)
         return CompCode.Crash, cksum
-    ret, out = run_cmd(f"{exe}", PROG_TIMEOUT)
+    ret, out = run_cmd(f"qemu-riscv64 -L /usr/riscv64-linux-gnu {exe}", PROG_TIMEOUT)
     cksum = read_checksum(out)
     write_bug_desc_to_file(src, f"EXITof {compiler}: {ret}")
     write_bug_desc_to_file(src, f"CKSMof {compiler}: {cksum}")
@@ -258,7 +330,7 @@ def run_one(
                 flush=True,
             )
         if ret == CompCode.Wrong:
-            if not check_sanitizers(syn_f) or not check_ccomp(syn_f, random_count=30):
+            if not check_sanitizers(syn_f):
                 print(f"Inconsistent output due to UB {syn_f}", flush=True)
                 continue
             rand_name = generate_random_string(8)

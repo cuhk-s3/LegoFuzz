@@ -7,6 +7,7 @@ __pycache__/
 fuzz/
 bugs/
 out/
+llm_funcs/
 
 # Prerequisites
 *.d

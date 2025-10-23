@@ -139,16 +139,27 @@ class TypeInfo:
         self.fmt = fmt
 
 VAR_MAP = []
+# INT8: int8_t
 VAR_MAP.append(TypeInfo(VarType.INT8, VarType.PTR_INT8, ["int8_t"], [-128, 127], ctypes.c_int8, "PRId8"))
+# UINT8: uint8_t
 VAR_MAP.append(TypeInfo(VarType.UINT8, VarType.PTR_UINT8, ["uint8_t"], [0, 255], ctypes.c_uint8, "PRIu8"))
-VAR_MAP.append(TypeInfo(VarType.INT16, VarType.PTR_INT16, ["int16_t"], [-32768, 32767], ctypes.c_int16, "PRId16"))
-VAR_MAP.append(TypeInfo(VarType.UINT16, VarType.PTR_UINT16, ["uint16_t"], [0, 65535], ctypes.c_uint16, "PRIu16"))
-VAR_MAP.append(TypeInfo(VarType.INT32, VarType.PTR_INT32, ["int", "int32_t"], [-2147483648, 2147483647], ctypes.c_int32, "PRId32"))
+# INT16: short, signed short, short int, signed short int, int16_t
+VAR_MAP.append(TypeInfo(VarType.INT16, VarType.PTR_INT16, ["short", "signed short", "short int", "signed short int", "int16_t"], [-32768, 32767], ctypes.c_int16, "PRId16"))
+# UINT16: unsigned short, unsigned short int, short unsigned, short unsigned int, uint16_t
+VAR_MAP.append(TypeInfo(VarType.UINT16, VarType.PTR_UINT16, ["unsigned short", "unsigned short int", "short unsigned", "short unsigned int", "uint16_t"], [0, 65535], ctypes.c_uint16, "PRIu16"))
+# INT32: int, signed int, int32_t
+VAR_MAP.append(TypeInfo(VarType.INT32, VarType.PTR_INT32, ["int", "signed int", "int32_t"], [-2147483648, 2147483647], ctypes.c_int32, "PRId32"))
+# UINT32: unsigned int, uint32_t
 VAR_MAP.append(TypeInfo(VarType.UINT32, VarType.PTR_UINT32, ["unsigned int", "uint32_t"], [0, 4294967295], ctypes.c_uint32, "PRIu32"))
-VAR_MAP.append(TypeInfo(VarType.INT64, VarType.PTR_INT64, ["long", "int64_t"], [-9223372036854775808, 9223372036854775807], ctypes.c_int64, "PRId64"))
-VAR_MAP.append(TypeInfo(VarType.UINT64, VarType.PTR_UINT64, ["unsigned long", "uint64_t"], [0, 18446744073709551615], ctypes.c_uint64, "PRIu64"))
-VAR_MAP.append(TypeInfo(VarType.CHAR, VarType.PTR_CHAR, ["char"], [-128, 127], ctypes.c_int8, "PRId8"))
+# INT64: long, signed long, long int, signed long int, long long, signed long long, long long int, signed long long int, int64_t
+VAR_MAP.append(TypeInfo(VarType.INT64, VarType.PTR_INT64, ["long", "signed long", "long int", "signed long int", "long long", "signed long long", "long long int", "signed long long int", "int64_t"], [-9223372036854775808, 9223372036854775807], ctypes.c_int64, "PRId64"))
+# UINT64: unsigned long, unsigned long int, long unsigned, long unsigned int, unsigned long long, unsigned long long int, long long unsigned, long long unsigned int, uint64_t
+VAR_MAP.append(TypeInfo(VarType.UINT64, VarType.PTR_UINT64, ["unsigned long", "unsigned long int", "long unsigned", "long unsigned int", "unsigned long long", "unsigned long long int", "long long unsigned", "long long unsigned int", "uint64_t"], [0, 18446744073709551615], ctypes.c_uint64, "PRIu64"))
+# CHAR: char, signed char
+VAR_MAP.append(TypeInfo(VarType.CHAR, VarType.PTR_CHAR, ["char", "signed char"], [-128, 127], ctypes.c_int8, "PRId8"))
+# UCHAR: unsigned char
 VAR_MAP.append(TypeInfo(VarType.UCHAR, VarType.PTR_UCHAR, ["unsigned char"], [0, 255], ctypes.c_uint8, "PRIu8"))
+# VOID: void
 VAR_MAP.append(TypeInfo(VarType.VOID, VarType.PTR_VOID, ["void"], [0, 0], None, None))
 
 

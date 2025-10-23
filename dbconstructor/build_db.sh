@@ -175,7 +175,7 @@ fi
 
 # Profile functions
 print_status "Step 3/3: Profiling functions..."
-./profile.py --src "$FUNCTIONS_IO_JSON" --dst "$OUTPUT_DATABASE"
+./profile.py --src "$FUNCTIONS_IO_JSON" --dst "$OUTPUT_DATABASE" --cpu "$CPU_COUNT"
 
 if [[ $? -ne 0 ]]; then
     print_error "Failed to profile functions"
