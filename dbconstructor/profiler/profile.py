@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import glob
 import json
 import os, re, tempfile, sys, argparse
 from datetime import datetime
@@ -16,10 +17,22 @@ from iogenerator.variable import VarType
 
 CC1 = "gcc"  # use two compilers to avoid unspecified behavior
 CC2 = "clang"
-COMPILERS = ["gcc", "clang"]  # test with both compilers
+COMPILERS = ["clang"]  # test with both compilers
 OPT_LEVELS = ["-O0", "-O1", "-O2", "-O3"]  # optimization levels to test
 NUM_ENV = 5  # number of env variables used for each tag, "1" means one env_val, e.g., Tag1:tag_val:env_val
 PROFILER = f"{os.path.dirname(__file__)}/build/bin/profiler --mode=expr"
+def find_riscv_vector_include():
+    clang_path = sp.check_output(['which', 'clang'], text=True).strip()
+    clang_root = os.path.dirname(os.path.dirname(clang_path))
+    candidate_dirs = glob.glob(os.path.join(clang_root, 'lib', 'clang', '*', 'include'))
+
+    for inc_dir in candidate_dirs:
+        if os.path.exists(os.path.join(inc_dir, 'riscv_vector.h')):
+            return os.path.join(inc_dir, 'riscv_vector.h')
+
+    raise FileNotFoundError("No path to include is found")
+
+CC_ARGS = f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
 
 INVALID_TAG_VALUE = 111  # we use this value to indicate invalid tag values
 
@@ -359,7 +372,7 @@ return v0; \
         Note: we would rename tags to Tag{tag_id}_{func_name} before profiling.
         """
         # profiling
-        ret, _ = run_cmd(f"{PROFILER} {filename} --", DEBUG=self.DEBUG)
+        ret, _ = run_cmd(f"{PROFILER} {filename} -- -w {CC_ARGS}", DEBUG=self.DEBUG)
         if ret != CMD.OK:
             raise ProfilerError
 
@@ -380,7 +393,7 @@ return v0; \
                     tmp_f.close()
                     exe_out = tmp_f.name
                     # compile with current compiler and opt level
-                    ret, compile_err = run_cmd(f"{compiler} -w {opt_level} {filename} -o {exe_out}", DEBUG=self.DEBUG)
+                    ret, compile_err = run_cmd(f"{compiler} -w {opt_level} {filename} {CC_ARGS} -o {exe_out}", DEBUG=self.DEBUG)
                     if ret != CMD.OK:
                         if os.path.exists(exe_out):
                             os.remove(exe_out)
@@ -392,7 +405,8 @@ return v0; \
                             )
                         # Skip this compiler/opt combination if compilation fails
                         continue
-                    ret, profile_out = run_cmd(exe_out, timeout=3, DEBUG=self.DEBUG)
+                    exe_out_cmd = f"qemu-riscv64 -L /usr/riscv64-linux-gnu {exe_out}"
+                    ret, profile_out = run_cmd(exe_out_cmd, timeout=10, DEBUG=self.DEBUG)
                     if ret != CMD.OK:
                         os.remove(exe_out)
                         if self.DEBUG:

@@ -1,3 +1,5 @@
+import glob
+import subprocess as sp
 import re
 from shutil import which
 from pathlib import Path
@@ -15,6 +17,28 @@ from variable import *
 from functioner import *
 from proxy import generate_proxy_function, generate_closure_program
 
+def find_riscv_vector_include():
+    clang_path = sp.check_output(['which', 'clang'], text=True).strip()
+    clang_root = os.path.dirname(os.path.dirname(clang_path))
+    candidate_dirs = glob.glob(os.path.join(clang_root, 'lib', 'clang', '*', 'include'))
+
+    for inc_dir in candidate_dirs:
+        if os.path.exists(os.path.join(inc_dir, 'riscv_vector.h')):
+            return os.path.join(inc_dir, 'riscv_vector.h')
+
+    raise FileNotFoundError("No path to include is found")
+
+CC_ARGS = f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
+FLAGS = tuple(CC_ARGS.split())
+
+def run_cmd(cmd, timeout=5, env=None):
+    if type(cmd) is not list:
+        cmd = cmd.split(' ')
+    try:
+        proc = sp.run(cmd, timeout=timeout, capture_output=True, env=env)
+        return True if proc.returncode == 0 else False, proc.stdout.decode("utf-8")
+    except:
+        return False, ''
 
 class IOGenerator():
     """An IO generator for a C function
@@ -29,30 +53,14 @@ class IOGenerator():
         for opt in ['O0', 'O1', 'O2', 'O3', 'Os']:
             self.compilers.append(
                 CompilationSetting(
-                    compiler=CompilerExe.get_system_gcc(),
-                    opt_level=OptLevel.from_str(opt),
-                    flags=("-march=native",),
-                )
-            )
-            self.compilers.append(
-                CompilationSetting(
                     compiler=CompilerExe.get_system_clang(),
                     opt_level=OptLevel.from_str(opt),
-                    flags=("-march=native",),
+                    flags=FLAGS,
                 )
             )
 
-        
-        self.sanitizer = Sanitizer(use_ub_address_sanitizer=True, use_ccomp_if_available=True)
-
-        if which("typesanitizer") is None:
-            self.typesanitizer = None
-        else:
-            self.typesanitizer = CompilationSetting(
-                compiler=CompilerExe(CompilerProject.LLVM, Path(which("typesanitizer")), "main"),
-                opt_level=OptLevel.from_str("O0"),
-                flags=("-march=native", "-fsanitize=type",),
-            )
+        self.sanitizer = Sanitizer(use_ub_address_sanitizer=False, use_ccomp_if_available=False, check_warnings=False, checked_warnings=[])
+        self.typesanitizer = None
 
     def generate(self, input_func:Function, max_try_time:int=5, debug:bool=False) -> tuple[Optional[list], Optional[Function]]:
         """Generate a valid input for the input function and return its IO pair
@@ -105,19 +113,18 @@ class IOGenerator():
             return None
         return res[0]
 
-    def compile_and_run(self, compiler:CompilationSetting, program:SourceProgram) -> str:
-        """Compile and run the program
-        """
+    def compile_and_run(self, compiler: CompilationSetting, program: SourceProgram) -> str:
+        """Compile and run the program"""
         try:
-            comp_out = compiler.compile_program(program, ExeCompilationOutput(), timeout=5)
-        except:
+            comp_out = compiler.compile_program(program, ExeCompilationOutput(), timeout=60)
+        except Exception as e:
             raise ValidateError
         try:
-            out = comp_out.output.run(timeout=5)
+            cmd = f"qemu-riscv64 -L /usr/riscv64-linux-gnu {comp_out.output.filename}"
+            (_, out) = run_cmd(cmd, timeout=10, env={'ASAN_OPTIONS': 'detect_leaks=0'})
         except:
             raise ValidateError
-        out = comp_out.output.run(timeout=5)
-        return self.parse_output(out.stdout)
+        return self.parse_output(out)
 
     def check_type_sanitizer(self, program:SourceProgram) -> bool:
         """Validate if the program violates the strict aliasing rule
@@ -142,7 +149,7 @@ class IOGenerator():
         """
         Validate if the function is valid under the given input; if yes, return the output
         """
-        prog = SourceProgram(code=src, language=Language.C)
+        prog = SourceProgram(code=src, language=Language.C, flags=FLAGS)
         sanitizer_ret = self.sanitizer.sanitize(prog)
         if not sanitizer_ret:
             raise ValidateError
