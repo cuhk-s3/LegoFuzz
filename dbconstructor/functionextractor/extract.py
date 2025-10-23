@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import glob
 import os, argparse, json, tempfile, re, random, string
 from pathlib import Path
 import subprocess as sp
@@ -13,12 +14,23 @@ from diopter.compiler import (
     Language,
 )
 
+def find_riscv_vector_include():
+    clang_path = sp.check_output(['which', 'clang'], text=True).strip()
+    clang_root = os.path.dirname(os.path.dirname(clang_path))
+    candidate_dirs = glob.glob(os.path.join(clang_root, 'lib', 'clang', '*', 'include'))
+
+    for inc_dir in candidate_dirs:
+        if os.path.exists(os.path.join(inc_dir, 'riscv_vector.h')):
+            return os.path.join(inc_dir, 'riscv_vector.h')
+
+    raise FileNotFoundError("No path to include is found")
+
 # path of functionextractor
 FUNCTION_EXTRACTOR_PATH = os.path.join(
     os.path.dirname(__file__), "build/bin/functionextractor"
 )
 # compiler args such as -I$CSMITH_HOME/include
-CC_ARGS = ""
+CC_ARGS = f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
 # minimum size of extracted function in tokens separated by space
 MIN_FUNC_SIZE = 0
 
@@ -97,17 +109,17 @@ def extract_one_file(src_file):
         compiler=CompilerExe.get_system_clang(),
         opt_level=OptLevel.O0,
     )
-    pre_prog = comp.preprocess_program(prog)
+    pre_prog = comp.preprocess_program(prog, additional_flags=tuple(CC_ARGS.split()))
 
     with tempfile.NamedTemporaryFile(suffix=".c", mode="w", delete=False) as tmp_f:
         tmp_f.write(pre_prog.get_modified_code())
         tmp_f.close()
         tmp_f_path = tmp_f.name
 
-    # --mode process
-    ret, _ = run_cmd(
-        f"{FUNCTION_EXTRACTOR_PATH} --mode process {tmp_f_path} -- -w {CC_ARGS}"
-    )
+    # # --mode process
+    # ret, _ = run_cmd(
+    #     f"{FUNCTION_EXTRACTOR_PATH} --mode process {tmp_f_path} -- -w {CC_ARGS}"
+    # )
     # --mode extract
     ret, res = run_cmd(
         f"{FUNCTION_EXTRACTOR_PATH} --mode extract {tmp_f_path} -- -w {CC_ARGS}"
