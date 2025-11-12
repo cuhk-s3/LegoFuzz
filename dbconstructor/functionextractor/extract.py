@@ -105,14 +105,16 @@ def extract_one_file(src_file):
 
     with open(tmp_src_file_path, "r") as f:
         prog = SourceProgram(code=f.read(), language=Language.C)
-    comp = CompilationSetting(
-        compiler=CompilerExe.get_system_clang(),
-        opt_level=OptLevel.O0,
-    )
-    pre_prog = comp.preprocess_program(prog, additional_flags=tuple(CC_ARGS.split()))
+    
+    # comp = CompilationSetting(
+    #     compiler=CompilerExe.get_system_clang(),
+    #     opt_level=OptLevel.O0,
+    # )
+    # pre_prog = comp.preprocess_program(prog, additional_flags=tuple(CC_ARGS.split()))
 
     with tempfile.NamedTemporaryFile(suffix=".c", mode="w", delete=False) as tmp_f:
-        tmp_f.write(pre_prog.get_modified_code())
+        tmp_f.write(prog.code)
+        # tmp_f.write(pre_prog.get_modified_code())
         tmp_f.close()
         tmp_f_path = tmp_f.name
 

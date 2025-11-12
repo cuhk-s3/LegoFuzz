@@ -32,10 +32,13 @@ CSMITH_HOME = os.environ["CSMITH_HOME"]
 
 GEN_BASE = "/data/yunboni/projects/compiler-fuzz-ci/compiler_flags_gen/target/debug/compiler_flags_gen"
 GEN_TIMEOUT = 5
-GEN_BASIC_CMD = f"{GEN_BASE} --llvm --compile --flags basic-flags"
 
-def gen_random_basic_flags() -> list[str]:
-    ret, out = run_cmd(GEN_BASIC_CMD, GEN_TIMEOUT)
+def gen_random_basic_flags(compiler: str) -> list[str]:
+    if "clang" in compiler:
+        gen_cmd = f"{GEN_BASE} --llvm --compile --flags basic-flags"
+    else:
+        gen_cmd = f"{GEN_BASE} --gcc --compile --flags basic-flags"
+    ret, out = run_cmd(gen_cmd, GEN_TIMEOUT)
     if ret != 0 or not out:
         return []
     tokens = [t for t in out.strip().split() if t.startswith("-")]
@@ -44,7 +47,7 @@ def gen_random_basic_flags() -> list[str]:
         "-fuse-ld=", "-static", "-shared", "-pie", "-nostdlib", "-nodefaultlibs",
         "-Wl,", "--sysroot", "-l", "-L",
     )
-    extra_drop_exact = {"-flto", "-ffat-lto-objects"}
+    extra_drop_exact = {"-flto", "-ffat-lto-objects", "-mbig-endian", "-msave-restore"}
     # filter out flags that are known to cause heavy work or are undesirable
     # also drop any register-fixed flags like '-ffixed-x19'
     return [t for t in tokens if 'ffixed' not in t and not any(t.startswith(p) for p in drop_prefixes) and t not in extra_drop_exact]
@@ -58,10 +61,13 @@ def find_riscv_vector_include():
             return os.path.join(inc_dir, 'riscv_vector.h')
     raise FileNotFoundError("No path to include is found")
 
-CC_ARGS = f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
-CC = CompilationSetting(compiler=CompilerExe.get_system_gcc(), opt_level=OptLevel.O3, flags=CC_ARGS)
-SAN_CCOMP = this_CComp.get_system_ccomp()
 WORK_DIR = "work"
+
+def get_cc_args(compiler: str):
+    if "clang" in compiler:
+        return f"--target=riscv64-unknown-linux-gnu -march=rv64gcv -mabi=lp64d -menable-experimental-extensions -I{find_riscv_vector_include()}"
+    else:
+        return "-march=rv64gcv -mabi=lp64d"
 
 class CompCode(Enum):
     OK = auto()
@@ -102,9 +108,8 @@ def read_checksum(data):
     res = re.findall(r"checksum = (.*)", data)
     return res[0] if len(res) > 0 else "NO_CKSUM"
 
-def compile_and_run(compiler, src, cc_args=None):
+def compile_and_run(compiler, src, cc_args):
     """compile and run once with given args"""
-    cc_args = cc_args or CC_ARGS
     cksum = ""
     tmp_f = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
     exe = tmp_f.name
@@ -127,18 +132,24 @@ def compile_and_run(compiler, src, cc_args=None):
     return CompCode.OK, cksum
 
 def check_compile(src: str, compilers: list) -> CompCode:
-    """Each compiler: 1×base + 5×random flags."""
+    """Each compiler: 1×base + 1xgisel + 5×random flags."""
     for comp in compilers:
-        ret, cksum = compile_and_run(comp, src, CC_ARGS)
+        cc_args = get_cc_args(comp)
+        ret, cksum = compile_and_run(comp, src, cc_args)
         if DEBUG:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} base", flush=True)
         if ret != CompCode.OK:
             return ret
+        
+        # ret, cksum = compile_and_run(comp, src, f"{CC_ARGS} -fglobal-isel")
+        # if DEBUG:
+        #     print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} gisel", flush=True)
+        # if ret != CompCode.OK:
+        #     return ret
 
         for i in range(5):
-            flags = gen_random_basic_flags()
-            flags.remove("-msave-restore") if "-msave-restore" in flags else None 
-            cc_args = CC_ARGS if not flags else f"{CC_ARGS} {' '.join(flags)}"
+            flags = gen_random_basic_flags(comp)
+            cc_args = cc_args if not flags else f"{cc_args} {' '.join(flags)}"
             if DEBUG:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} random flags {i+1}/5: {' '.join(flags) if flags else '(none)'}", flush=True)
             ret, cksum = compile_and_run(comp, src, cc_args)
