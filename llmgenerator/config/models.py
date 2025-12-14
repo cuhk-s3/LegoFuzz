@@ -67,6 +67,7 @@ class OpenAIClient(LLMClient):
     def __init__(self, api_key):
         self.client = OpenAI(
             api_key=api_key,
+            base_url="http://localhost:4142/",
         )
         
     def create_chat_completion(self, messages, **kwargs):

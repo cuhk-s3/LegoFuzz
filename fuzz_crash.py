@@ -116,6 +116,9 @@ def compile_and_run(compiler, src, cc_args):
     tmp_f.close()
     cmd = f"{compiler} {src} {cc_args} -o {exe}"
     ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
+    # workaround for difference between clang and gcc
+    if "-Wincompatible-pointer-types" in out: 
+        return CompCode.OK, cksum
     if ret == 124:
         time.sleep(1)
         ret, out = run_cmd(cmd, COMPILER_TIMEOUT)
@@ -140,12 +143,13 @@ def check_compile(src: str, compilers: list) -> CompCode:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} base", flush=True)
         if ret != CompCode.OK:
             return ret
-        
-        # ret, cksum = compile_and_run(comp, src, f"{CC_ARGS} -fglobal-isel")
-        # if DEBUG:
-        #     print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} gisel", flush=True)
-        # if ret != CompCode.OK:
-        #     return ret
+
+        if "clang" in comp:
+            ret, cksum = compile_and_run(comp, src, f"{cc_args} -fglobal-isel")
+            if DEBUG:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] {comp} gisel", flush=True)
+            if ret != CompCode.OK:
+                return ret
 
         for i in range(5):
             flags = gen_random_basic_flags(comp)

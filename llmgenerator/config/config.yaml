@@ -15,108 +15,80 @@ STOP:
   - "</s>"
   - "[INST]"
 
-MAX_THREADS: 100
+MAX_THREADS: 32
 
 PROMPT_ROLE: |
-  You are an expert in converting complex C programs into a single, standalone C function.
-  Your role is to analyze the given C program, understand its logic in depth, and transform it into one self-contained C function that preserves the original behavior while adhering to all specified constraints.
+    You are an expert in analyzing complex C programs with RISC-V Vector intrinsics.
 
 PROMPT_CODE: |
-  Convert the given C program to one single compilable C function that takes integer inputs and returns an integer:
+  You are given a C function that uses RISC-V vector intrinsics.
+  Your task is to automatically check and correct the code to make it safe, well-defined, and robust, without changing its core semantics.
+
+  Follow these steps carefully:
+
+  **Step 1: Understand intrinsic semantics**
+  - Parse the function and identify each RISC-V intrinsic (e.g., vle, vse, vadd, vlseg, etc.).
+  - Determine the expected operand types, data widths (e8/e16/e32/e64), and required alignment constraints.
+  - Infer the valid range for `vl` and the necessary alignment boundary based on the intrinsic element width and vector type.
+
+  **Step 2: Derive parameter constraints**
+  - From the intrinsic semantics, infer:
+    - Valid address alignment (e.g., 4-byte alignment for `vle32`/`vse32`, 1-byte for `vle8`, etc.).
+    - Safe range for `vl` according to the element type and hardware capacity.
+    - Pointers that must not be null or misaligned.
+
+  **Step 3: Apply validation and correction**
+  - Check all pointer arguments (`src`, `dst`, etc.) and return safely if any are null.
+  - Clamp `vl` to a valid, nonzero range (`0 < vl ≤ MAX_VL`).
+  - Align all relevant addresses down to the nearest valid boundary using bit masking (e.g., `addr & ~(alignment - 1)`).
+  - Use the correct `__riscv_vsetvl_*` intrinsic to ensure `vl` is hardware-safe and consistent with element type.
+
+  **Step 4: Generate the corrected version**
+  - Produce clean, compilable C code.
+  - Do not include any comments, printing, logging, or explanations.
+  - Preserve the original computation logic exactly, only adding checks and safe corrections.
+
+  Example:
+
+  Given the program:
+  ```c
+  #include <riscv_vector.h>
+  int add_vec(const int32_t *a, const int32_t *b, int32_t *out, size_t vl) {{
+    vint32m4_t va = __riscv_vle32_v_i32m4(a, vl);
+    vint32m4_t vb = __riscv_vle32_v_i32m4(b, vl);
+    __riscv_vse32_v_i32m4(out, __riscv_vadd_vv_i32m4(va, vb, vl), vl);
+    return 0;
+  }}
+  ```
+
+  Convert it to the safe function:
+  ```c
+  #include <riscv_vector.h>
+  #include <stddef.h>
+  #include <stdint.h>
+  int add_vec(const int32_t *a, const int32_t *b, int32_t *out, size_t vl) {{
+    if (!a || !b || !out) return -1;
+    const size_t MAX_VL = 256;
+    if (vl == 0) return 0;
+    if (vl > MAX_VL) vl = MAX_VL;
+    uintptr_t a_addr = (uintptr_t)a & ~((uintptr_t)0x3);
+    uintptr_t b_addr = (uintptr_t)b & ~((uintptr_t)0x3);
+    uintptr_t o_addr = (uintptr_t)out & ~((uintptr_t)0x3);
+    const int32_t *sa = (const int32_t *)a_addr;
+    const int32_t *sb = (const int32_t *)b_addr;
+    int32_t *so = (int32_t *)o_addr;
+    vl = __riscv_vsetvl_e32m4(vl);
+    vint32m4_t va = __riscv_vle32_v_i32m4(sa, vl);
+    vint32m4_t vb = __riscv_vle32_v_i32m4(sb, vl);
+    __riscv_vse32_v_i32m4(so, __riscv_vadd_vv_i32m4(va, vb, vl), vl);
+    return 0;
+  }}
+  ```
+
+  Accordingly, transform the following code:
   ```c
   {code_snippet}
   ```
-  ### **Steps:**
-  1. **Extract definitions**: Identify and extract all preprocessor definitions and typedefs.
-  2. **Extract type declarations**: Identify forward declarations and struct definitions.
-  3. **Process variables and functions**: Identify all variable declarations and function signatures.
-  4. **Merge logic**: Inline all function implementations into one single function.
-  5. **Final verification**: Ensure the final function takes only plain integer inputs.
-
-  ### Instructions:
-  - Ensure explicit integer-only I/O.
-  - Generate exactly one function.
-  - Preserve all logic.
-  - Ensure compatibility.
-  - No standard I/O functions.
-  - Avoid undefined behavior.
-
-  ### Example of Incorrect Conversion:
-  ------------------- Original -------------------
-  /* Variables and functions */
-  int iwl_trans_write8(struct iwl_trans*, int, int);
-  int trace_iwlwifi_dev_iowrite8(int, int, int);
-  
-  __attribute__((used)) static inline void iwl_write8(struct iwl_trans *trans, u32 ofs, u8 val) {{
-      trace_iwlwifi_dev_iowrite8(trans->dev, ofs, val);
-      iwl_trans_write8(trans, ofs, val);
-  }}
-
-  ------------------- **Incorrect Transformed** -------------------
-  #include <stdlib.h>
-  struct iwl_trans {{
-      int dev;
-  }};
-  void iwl_trans_write8(struct iwl_trans *trans, unsigned int ofs, unsigned char val) {{
-      // Placeholder for the actual write operation
-  }}
-  void trace_iwlwifi_dev_iowrite8(int dev, unsigned int ofs, unsigned char val) {{
-      // Placeholder for the actual tracing operation
-  }}
-  int iwl_write8(int dev, unsigned int ofs, unsigned char val) {{
-      struct iwl_trans trans;
-      trans.dev = dev;
-      trace_iwlwifi_dev_iowrite8(trans.dev, ofs, val);
-      iwl_trans_write8(&trans, ofs, val);
-      return 0;
-  }}
-
-  ### Example of Correct Conversion:
-  -------------------Original-------------------
-  #define NULL ((void*)0)
-  typedef unsigned long size_t;
-  typedef long intptr_t; typedef unsigned long uintptr_t;
-  typedef long scalar_t__;
-  typedef int bool;
-  #define false 0
-  #define true 1
-
-  typedef struct TYPE_4__ TYPE_1__;
-
-  struct TYPE_4__ {{ scalar_t__ nalloc; scalar_t__ len; char* body; }};
-  typedef TYPE_1__ Buffer;
-
-  int realloc_body(TYPE_1__*);
-
-  void buf_write(Buffer *b, char c) {{
-      if (b->nalloc == (b->len + 1))
-          realloc_body(b);
-      b->body[b->len++] = c;
-  }}
-
-  -------------------Transformed-------------------
-  #include <stdlib.h>
-
-  typedef struct {{
-      size_t nalloc;
-      size_t len;
-      char *body;
-  }} Buffer;
-
-  int buf_write(int nalloc, int len, char *body, char c) {{
-      Buffer b;
-      b.nalloc = nalloc;
-      b.len = len;
-      b.body = body;
-
-      if (b.nalloc == (b.len + 1)) {{
-          b.nalloc *= 2;
-          b.body = realloc(b.body, b.nalloc);
-      }}
-
-      b.body[b.len++] = c;
-      return b.len;
-  }}
 
   ### Final Requirement:
   Provide only the correctly transformed function without any explanations or comments. Ensure the output adheres strictly to all the above instructions.
